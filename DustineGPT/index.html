@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DustineGPT</title>
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" type="image/jpg" href="favicon.jpg">
+  <style>
+    :root{
+      --bg:#0a0a0a;           /* black base */
+      --fg:#fafafa;           /* white text */
+      --muted:#9ca3af;        /* gray */
+      --accent:#ffffff;       /* keep BW theme */
+      --card:#111113;         /* dark card */
+      --ring:rgba(255,255,255,.16);
+      --glass:rgba(255,255,255,.06);
+      --shadow:0 10px 30px rgba(0,0,0,.45);
+      --radius:18px;          /* rounded buttons, cards */
+      --grad1:#8a2be2; /* ungu */
+      --grad2:#0b3bff; /* biru tua */
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--fg);
+      overflow:hidden;
+    }
+    /* ====== BACKGROUND: gradient + twinkling stars ====== */
+    .sky{
+      position:fixed; inset:0; z-index:-2; overflow:hidden;
+      background:
+        radial-gradient(1200px 800px at 80% 10%, rgba(25, 0, 255, 0.22), transparent 60%),
+        radial-gradient(1000px 700px at 10% 90%, rgba(140,0,255,.28), transparent 60%),
+        linear-gradient(160deg, #0b0220 0%, #060616 50%, #04040b 100%);
+    }
+    canvas.stars{position:absolute; inset:0; width:100%; height:100%; display:block;}
+
+    /* ====== SPLASH: logo intro -> loading screen ====== */
+    #splash{position:fixed; inset:0; display:grid; place-items:center; background:transparent; z-index:50;}
+    .splash-inner{display:grid; gap:28px; place-items:center; text-align:center;}
+
+    .logo{
+      width:160px; height:160px; border-radius:32px; padding:18px;
+      background:linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+      box-shadow: var(--shadow), inset 0 0 0 1px var(--ring);
+      display:grid; place-items:center;
+      transform: translateY(6px);
+      animation: floaty 3s ease-in-out infinite;
+    }
+    @keyframes floaty{0%,100%{transform:translateY(6px)}50%{transform:translateY(-6px)}}
+
+    .mark{width:96px; height:96px;}
+    .mark path{fill:none; stroke:#fff; stroke-width:8; stroke-linecap:round; stroke-linejoin:round;
+      filter: drop-shadow(0 4px 10px rgba(255,255,255,.12));
+      stroke-dasharray: 420; stroke-dashoffset: 420; animation: draw 1.6s ease forwards;
+    }
+    @keyframes draw{to{stroke-dashoffset:0}}
+
+    .loader{width:min(520px, 80vw); background:rgba(255,255,255,.06); border-radius:999px; padding:6px; box-shadow:inset 0 0 0 1px var(--ring);}    
+    .bar{height:14px; width:0%; border-radius:999px; background: linear-gradient(90deg, rgba(255,255,255,.9), rgba(255,255,255,.65)); box-shadow:0 8px 22px rgba(255,255,255,.18); transition:width .12s linear}
+    .loading-label{font-size:14px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase}
+
+    /* Fade in app when ready */
+    #app{opacity:0; pointer-events:none; transition:opacity .5s ease; z-index:10;}
+    #app.ready{opacity:1; pointer-events:auto}
+
+    /* ====== APP LAYOUT ====== */
+    .container{display:grid; grid-template-rows:auto 1fr auto; height:100vh;}
+    header{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; backdrop-filter: blur(6px); background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)); border-bottom:1px solid var(--ring)}
+    .brand{display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.02em}
+    .brand .mini{width:28px; height:28px; display:grid; place-items:center; border-radius:10px; background:rgba(255,255,255,.09); box-shadow:inset 0 0 0 1px var(--ring)}
+    .brand .name{font-size:16px}
+
+    main{display:grid; grid-template-columns:1fr; max-width:1100px; margin:0 auto; width:100%; gap:16px; padding:18px;}
+
+    /* Chat panel */
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid var(--ring); border-radius:var(--radius); box-shadow: var(--shadow); display:grid; grid-template-rows: 1fr auto; overflow:hidden; min-height:58vh}
+    .messages{padding:20px; overflow:auto; scroll-behavior:smooth; height:100%}
+    .bubble{max-width:80%; padding:12px 14px; margin:10px 0; border-radius:18px; line-height:1.4; backdrop-filter: blur(4px)}
+    .bot{background:rgba(255,255,255,.06); border:1px solid var(--ring)}
+    .user{background:#ffffff; color:#0b0b0b; justify-self:end}
+    .row{display:flex; align-items:center; gap:10px}
+
+    /* Composer */
+    .composer{display:flex; gap:10px; padding:12px; background:rgba(255,255,255,.03); border-top:1px solid var(--ring)}
+    .input{flex:1; padding:14px 16px; background:#0f0f12; color:var(--fg); border:1px solid var(--ring); border-radius:16px; outline:none; transition: box-shadow .2s ease, transform .2s ease}
+    .input:focus{box-shadow:0 0 0 6px rgba(255,255,255,.06)}
+
+    .btn{position:relative; display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:12px 18px; border:1px solid var(--ring); background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06)); color:#0b0b0b; font-weight:700; letter-spacing:.02em; border-radius:999px; cursor:pointer; user-select:none; box-shadow: var(--shadow), inset 0 -6px 14px rgba(0,0,0,0.2); transition: transform .14s ease, filter .18s ease, box-shadow .2s ease}
+    .btn:hover{transform: translateY(-1px)}
+    .btn:active{transform: translateY(1px) scale(.98)}
+    .btn .rip{position:absolute; inset:0; border-radius:999px; overflow:hidden; pointer-events:none}
+    .btn .rip span{position:absolute; width:12px; height:12px; border-radius:999px; background:rgba(255,255,255,.7); transform:translate(-50%,-50%) scale(0); animation:ripple .6s ease-out forwards}
+    @keyframes ripple{to{transform:translate(-50%,-50%) scale(18); opacity:0}}
+
+    /* Utility */
+    .hidden{display:none !important}
+
+    /* mobile tweaks */
+    @media(max-width:640px){
+      .bubble{max-width:92%}
+      .loader{width:86vw}
+    }
+
+    /* ====== zGPT badge (pojok kanan bawah) as button ====== */
+    .zgpt-badge{
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 99999;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 2px 10px rgba(124,77,255,0.06);
+      cursor: pointer;
+      transform-origin: center;
+      transition: transform .18s ease, box-shadow .18s ease;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      outline: none;
+    }
+    .zgpt-badge:focus { box-shadow: 0 0 0 4px rgba(138,43,226,0.12); transform: translateY(-3px) scale(1.01); }
+    .zgpt-badge:hover{ transform: translateY(-4px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.7), 0 0 30px rgba(124,77,255,0.12); }
+
+    .zgpt-text{
+      font-weight:800;
+      font-size:12px;
+      letter-spacing:.06em;
+      background: linear-gradient(90deg,var(--grad1),var(--grad2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display:inline-block;
+      padding:2px 0;
+    }
+
+    /* soft pulse glow */
+    @keyframes pulse-glow{
+      0%{box-shadow:0 0 0 0 rgba(138,43,226,0.08);} 
+      50%{box-shadow:0 0 30px 8px rgba(11,59,255,0.04);} 
+      100%{box-shadow:0 0 0 0 rgba(138,43,226,0.08);} 
+    }
+    .zgpt-badge::after{
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 999px;
+      pointer-events: none;
+      animation: pulse-glow 3.6s infinite;
+      opacity: 0.9;
+    }
+
+    /* toast / modal kecil */
+    .zgpt-toast{
+      position: fixed;
+      right: 18px;
+      bottom: 76px; /* sits just above the badge */
+      z-index: 100000;
+      min-width: 280px;
+      max-width: 420px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+      padding: 12px 14px;
+      color: var(--fg);
+      transform-origin: bottom right;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px) scale(.98);
+      transition: opacity .22s ease, transform .22s ease;
+      backdrop-filter: blur(8px);
+    }
+    .zgpt-toast.show{
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+    .zgpt-toast .title{
+      font-weight:700;
+      font-size:13px;
+      margin-bottom:6px;
+      background: linear-gradient(90deg,var(--grad1),var(--grad2));
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+    .zgpt-toast .msg{ font-size:13px; color: var(--fg); line-height:1.38; }
+    .zgpt-toast .close{
+      position:absolute;
+      top:8px;
+      right:8px;
+      background:transparent;
+      border:0;
+      color:var(--muted);
+      font-size:14px;
+      cursor:pointer;
+    }
+
+    @media(max-width:520px){
+      .zgpt-toast{ right: 10px; left: 10px; bottom: 70px; max-width: unset; min-width: unset; }
+      .zgpt-badge{ right: 12px; bottom: 12px; }
+    }
+
+    /* ====== Settings modal ====== */
+    .modal-backdrop{
+      position:fixed; inset:0; z-index:120000; display:none; align-items:center; justify-content:center; padding:20px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.45));
+      backdrop-filter: blur(6px);
+    }
+    .modal-backdrop.show { display:flex; }
+    .modal{
+      width: min(520px, 96vw); background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border:1px solid var(--ring); border-radius:14px; padding:18px; box-shadow:var(--shadow); position:relative;
+    }
+    .modal h3{ margin:0 0 10px 0; font-size:18px }
+    .field{ display:flex; gap:8px; align-items:center; margin-top:12px }
+    .field input[type="password"]{ flex:1; padding:10px 12px; border-radius:10px; background:#0f0f12; border:1px solid var(--ring); color:var(--fg); }
+    .modal .hint{ font-size:13px; color:var(--muted); margin-top:8px }
+    .modal .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px }
+    .micro-msg{ font-size:13px; color:var(--muted); margin-top:8px; min-height:18px }
+
+    /* small btn variant for settings row */
+    .btn-sm{ padding:8px 12px; font-weight:700; border-radius:10px; font-size:13px }
+
+    /* slider styles */
+    .slider-row{ display:flex; align-items:center; gap:12px; margin-top:10px }
+    .slider-row input[type=range]{ flex:1 }
+    .small{ font-size:13px; color:var(--muted) }
+
+    /* Tombol tutup posisi pojok kanan atas modal pengaturan */
+.modal .btn-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* === Fancy glow sliders === */
+.fancy-slider{
+  -webkit-appearance:none;
+  width:100%;
+  height:12px;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--grad1),var(--grad2));
+  box-shadow:0 0 8px rgba(138,43,226,.45);
+  outline:none;
+  animation:glowPulse 4s ease-in-out infinite;
+  cursor:pointer;
+}
+@keyframes glowPulse {
+  0%,100%{ box-shadow:0 0 8px rgba(138,43,226,.45); }
+  50%    { box-shadow:0 0 16px rgba(11,59,255,.45); }
+}
+.fancy-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#fff;
+  border:3px solid var(--grad1);
+  transition:transform .15s,border-color .15s;
+}
+.fancy-slider:active::-webkit-slider-thumb{
+  transform:scale(1.1);
+  border-color:var(--grad2);
+}
+.fancy-slider::-moz-range-thumb{
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#fff;
+  border:3px solid var(--grad1);
+  transition:transform .15s,border-color .15s;
+}
+.fancy-slider:active::-moz-range-thumb{
+  transform:scale(1.1);
+  border-color:var(--grad2);
+}
+
+/* Efek pop untuk karakter saat diketik */
+@keyframes pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.char {
+  display:inline-block;
+  animation: pop 0.22s ease;
+}
+
+  </style>
+</head>
+<body>
+  <audio id="bgMusic" src="bg-music.mp3" loop></audio>
+
+  <div class="sky" aria-hidden="true">
+    <canvas class="stars" id="stars"></canvas>
+  </div>
+
+  <!-- Splash + Loading -->
+  <section id="splash" aria-label="Memulai DustineGPT">
+    <div class="splash-inner">
+      <div class="logo" aria-hidden="true">
+        <svg class="mark" viewBox="0 0 100 100" width="96" height="96" aria-hidden="true">
+          <path d="M25 20 L25 80 Q60 80 60 50 Q60 20 25 20"/>
+          <path d="M75 30 Q50 15 35 30 Q20 45 35 65 Q50 85 75 70 L75 55 L60 55"/>
+        </svg>
+      </div>
+      <div class="loader" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar" id="bar"></div>
+      </div>
+      <div class="loading-label" id="loadingLabel">Memuat…</div>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <div id="app" class="container" aria-live="polite">
+    <header>
+      <div class="brand">
+        <div class="mini" aria-hidden="true">
+          <svg viewBox="0 0 100 100" width="20" height="20">
+            <path d="M25 20 L25 80 Q60 80 60 50 Q60 20 25 20" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+            <path d="M75 30 Q50 15 35 30 Q20 45 35 65 Q50 85 75 70 L75 55 L60 55" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="name">DustineGPT</div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="musicBtn" title="Putar/Hentikan Musik"><span class="btn-label">🎵 Musik</span> <span class="rip"></span></button>
+
+        <!-- NEW: Settings button (same style & sound) -->
+        <button class="btn" id="settingsBtn" title="Pengaturan"><span class="btn-label">⚙️ Pengaturan</span> <span class="rip"></span></button>
+
+        <button class="btn" id="clearBtn" title="Hapus percakapan">🧹 Bersihkan <span class="rip"></span></button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" aria-label="Ruang Chat">
+        <div class="messages" id="messages"></div>
+        <div class="composer">
+          <input id="input" class="input" placeholder="Tulis pesan kamu… (Shift+Enter = baris baru)" />
+          <button id="send" class="btn" title="Kirim">➤ Kirim <span class="rip"></span></button>
+        </div>
+      </section>
+    </main>
+
+    <footer style="text-align:center; padding:8px; color:var(--muted); font-size:12px">
+      © <span id="y"></span> DustineGPT — AI terbaik sepanjang masa. (semoga)
+    </footer>
+  </div>
+
+  <!-- zGPT button -->
+  <button id="zgptBtn" class="zgpt-badge" aria-haspopup="true" aria-expanded="false" title="Tentang zGPT">
+    <span class="zgpt-text">zGPT 1.2</span>
+  </button>
+
+  <!-- toast message -->
+  <div id="zgptToast" class="zgpt-toast" role="status" aria-hidden="true" aria-live="polite">
+    <button class="close" id="zgptClose" aria-label="Tutup">✕</button>
+    <div class="title">Update zGPT 1.2</div>
+    <div class="msg">Update zGPT 1.2 ini adalah update yang membuat AI kami lebih bertambah pintar, walau ga seberapa. Kami menambah beberapa animasi dan tombol-tombol baru. Kami juga menambah tombol pengaturan dan untuk memasukkan kode API OpenAI yang membuat AI kami seperti ChatGPT. Makasi untuk dukungan kalian semua.</div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsBackdrop" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal" role="document">
+  <!-- === API KEY === -->
+  <h3 id="settingsTitle">Pengaturan API OpenAI</h3>
+  <div class="hint">Masukkan API key OpenAI kamu di bawah. Jangan beri tahu siapa-siapa kodemu karena kode API sangat sensitif. Kodemu akan disimpan di browser ini dengan aman.</div>
+
+  <div class="field" style="margin-top:12px;">
+    <input id="apiKeyInput" type="password" placeholder="sk-xxxxxx..." aria-label="API OpenAI" />
+    <button id="toggleShow" class="btn btn-sm" title="Tampilkan/Sembunyikan">👁️</button>
+  </div>
+
+  <div class="field" style="margin-top:10px;">
+    <button id="saveApiBtn" class="btn btn-sm">💾 Simpan</button>
+    <button id="copyApiBtn" class="btn btn-sm">📋 Salin</button>
+    <button id="clearApiBtn" class="btn btn-sm">🗑️ Hapus</button>
+    <button id="closeSettingsBtn" class="btn btn-sm btn-close">✕ Tutup</button>
+  </div>
+
+  <div class="micro-msg" id="settingsMsg" aria-live="polite"></div>
+
+  <div style="margin-top:12px; font-size:12px; color:var(--muted)">
+    Catatan: Kunci API tersimpan hanya di browser ini. Jangan bagikan key kamu.
+  </div>
+
+  <!-- === PENGATURAN BALASAN (dibawah API) === -->
+  <hr style="margin-top:20px; border:0; height:1px; background:rgba(255,255,255,.03);">
+  <h3 style="margin-top:12px">Pengaturan Balasan</h3>
+  <div class="hint">Atur kecepatan mengetik AI dan jeda sebelum AI mulai membalas. Pilihanmu akan otomatis tersimpan di browser ini.</div>
+
+  <div style="margin-top:10px;">
+    <label class="small">Preset cepat:</label>
+    <div class="field" style="margin-top:8px;">
+      <select id="speedPreset" class="input" style="max-width:220px;">
+        <option value="slow">Lambat (natural)</option>
+        <option value="normal">Normal</option>
+        <option value="fast">Cepat</option>
+        <option value="flash">Kilat</option>
+      </select>
+      <button id="resetSpeedBtn" class="btn btn-sm" style="margin-left:auto">🔁 Reset</button>
+    </div>
+
+    <div class="field" style="margin-top:14px; flex-direction:column; gap:4px;">
+      <div class="small">Kecepatan Mengetik: <span id="typingSpeedVal">24</span></div>
+      <input id="typingSpeedRange" type="range" min="3" max="80" step="1" class="fancy-slider">
+    </div>
+
+    <div class="field" style="margin-top:10px; flex-direction:column; gap:4px;">
+      <div class="small">Delay Sebelum Menjawab: <span id="responseDelayVal">450</span></div>
+      <input id="responseDelayRange" type="range" min="0" max="3000" step="50" class="fancy-slider">
+    </div>
+
+    <div class="small" style="margin-top:8px; color:var(--muted)">
+      Tip: Jika kamu tidak mengerti tentang ms, jika angka lebih kecil maka kecepatan akan semakin cepat.
+    </div>
+  </div>
+</div>
+
+
+
+  <script>
+    /* ========= HELPERS ========= */
+    const $ = (q,root=document)=>root.querySelector(q);
+    const $$ = (q,root=document)=>[...root.querySelectorAll(q)];
+
+   // WebAudio tiny SFX
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    function blip(f=220, t=0.08){
+      try{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='triangle'; o.frequency.setValueAtTime(f,ctx.currentTime);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+t);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+t+0.02);
+      }catch(e){/* ignore audio errors */ }
+    }
+    function clickSfx(){ blip(320, .06); setTimeout(()=>blip(180,.07), 40) }
+    function sendSfx(){ blip(520,.06); setTimeout(()=>blip(260,.12), 35) }
+    function successSfx(){ blip(760,.06); setTimeout(()=>blip(420,.09), 50) }
+
+    // Ripple helper for buttons (mouse event required for coordinates)
+    function ripple(btn, ev){
+      const rip = btn && btn.querySelector('.rip');
+      if(!rip) return;
+      const span = document.createElement('span');
+      const rect = btn.getBoundingClientRect();
+      const x = (ev && typeof ev.clientX==='number') ? (ev.clientX - rect.left) : (rect.width/2);
+      const y = (ev && typeof ev.clientY==='number') ? (ev.clientY - rect.top) : (rect.height/2);
+      span.style.left = x + 'px';
+      span.style.top  = y + 'px';
+      rip.appendChild(span);
+      setTimeout(()=>span.remove(), 620);
+    }
+
+    /* ========= STARRY BACKDROP ========= */
+    const starCanvas = $('#stars');
+    const sctx = starCanvas && starCanvas.getContext && starCanvas.getContext('2d');
+    let stars = [];
+    function resizeStars(){
+      if(!sctx) return;
+      starCanvas.width = window.innerWidth;
+      starCanvas.height = window.innerHeight;
+      const count = Math.min(350, Math.floor(window.innerWidth*window.innerHeight/6000));
+      stars = Array.from({length:count}, ()=>(({
+        x: Math.random()*starCanvas.width,
+        y: Math.random()*starCanvas.height,
+        r: Math.random()*1.2 + 0.2,
+        t: Math.random()*Math.PI*2,
+        s: Math.random()*0.8+0.2
+      })));
+    }
+    function drawStars(){
+      if(!sctx) return;
+      sctx.clearRect(0,0,starCanvas.width, starCanvas.height);
+      for(const st of stars){
+        st.t += 0.02*st.s; // twinkle
+        const alpha = 0.4 + Math.sin(st.t)*0.35;
+        sctx.beginPath();
+        sctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+        sctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        sctx.fill();
+      }
+      requestAnimationFrame(drawStars);
+    }
+    window.addEventListener('resize', resizeStars);
+    resizeStars(); drawStars();
+
+    /* ========= SPLASH + LOADING ========= */
+    const splash = $('#splash');
+    const bar = $('#bar');
+    const label = $('#loadingLabel');
+    const app = $('#app');
+    const start = performance.now();
+
+    function easeOutCubic(x){return 1 - Math.pow(1 - x, 3)}
+
+    let p = 0;
+    function animateBar(ts){
+      const elapsed = ts - start;
+      const total = 1400; // faster for UX
+      const ratio = Math.min(1, elapsed / total);
+      p = easeOutCubic(ratio);
+      const val = Math.floor(p*100);
+      if(bar) bar.style.width = (val+ (val>96? (100-val)*.2:0)) + '%';
+      if(label) label.textContent = val<100? `Memuat… ${val}%` : 'Siap!';
+      const loaderEl = document.querySelector('.loader');
+      if(loaderEl) loaderEl.setAttribute('aria-valuenow', val);
+      if(ratio < 1) requestAnimationFrame(animateBar); else setTimeout(showApp, 300);
+    }
+    requestAnimationFrame(animateBar);
+
+    function showApp(){
+      if(splash) splash.classList.add('hidden');
+      if(app) app.classList.add('ready');
+      // add initial bot bubble after app visible
+      setTimeout(()=> addBubble('Halo! Aku <strong>DustineGPT</strong> — tanya apa aja ✨', 'bot'), 200);
+    }
+
+    /* ========= CHAT LOGIC ========= */
+    const messages = $('#messages');
+    const input = $('#input');
+    const sendBtn = $('#send');
+    const clearBtn = $('#clearBtn');
+    $('#y').textContent = new Date().getFullYear();
+
+    function addBubble(text, who='bot'){
+      const wrap = document.createElement('div');
+      wrap.className = 'row';
+      const div = document.createElement('div');
+      div.className = `bubble ${who}`;
+      div.innerHTML = text;
+      wrap.appendChild(div);
+      if(messages) messages.appendChild(wrap);
+      if(messages) messages.scrollTop = messages.scrollHeight;
+      return div;
+    }
+
+    function sanitize(s){
+      const d=document.createElement('div'); d.textContent=s; return d.innerHTML;
+    }
+
+    function mockAI(prompt){
+      const p = prompt.toLowerCase();
+      if(p.trim()==='') return "Ketik sesuatu dulu ya 🙂";
+      if(/halo|hai|hei|hi/.test(p)) return "Halo! Tanyain apa aja, aku jawab sebaik mungkin.";
+      if(/siapa kamu|kamu siapa/.test(p)) return "Namaku itu DustineGPT. Yang bikin aku tuh orangnya unyu unyu ✨";
+      if(/minecraft|mc\b/.test(p)) return "Minecraft? Gas! Mau bahas redstone, command block, atau build aesthetic bintang-bintang?";
+      if(/help|bant(u|uan)|cara/.test(p)) return "Ketik pertanyaanmu. Gunakan Shift+Enter untuk baris baru. Klik 🧹 buat hapus percakapan.";
+      const tips = [
+        "Coba bagi masalahmu jadi langkah-langkah kecil.",
+        "Kalau ada contoh input/output, kasih ya biar aku presisi.",
+        "Butuh kode? Sebut bahasa & environment-nya.",
+        "Mau ringkas atau detail? Bilang aja." ];
+      const tip = tips[Math.floor(Math.random()*tips.length)];
+      return `Oke, aku denger: <strong>\"${sanitize(prompt)}\"</strong>.<br/>Jawabanku (ringkas): ${smartAnswer(prompt)}<br/><em>${tip}</em>`;
+    }
+
+    function smartAnswer(q){
+      const p = q.trim().toLowerCase();
+      if(p.endsWith('?')) return 'Menurutku jawabannya bergantung konteks—kasih detail tambahan ya biar akurat.';
+      if(p.length < 12) return 'Noted. Bisa ceritain lebih lengkap?';
+      if(/regex|regular expression/.test(p)) return 'Gunakan test case kecil dulu, lalu verifikasi edge case seperti spasi & karakter khusus.';
+      if(/performance|cepat|optim/.test(p)) return 'Fokus ke kompleksitas O(n), caching, dan profiling bottleneck utama.';
+      return 'Aku siap bantu langkah demi langkah. Ayo kita pecah masalahnya bareng.';
+    }
+
+    /* ========= TYPING / REPLY SPEED CONFIG ========= */
+    // keys
+    const KEY_TYPING_SPEED = 'reply_typing_speed'; // ms per char
+    const KEY_RESPONSE_DELAY = 'reply_response_delay'; // ms before starting
+    const DEFAULTS = { typingSpeed: 24, responseDelay: 450 };
+
+    function getReplySettings(){
+      const ts = parseInt(localStorage.getItem(KEY_TYPING_SPEED));
+      const rd = parseInt(localStorage.getItem(KEY_RESPONSE_DELAY));
+      return {
+        typingSpeed: Number.isFinite(ts) && !isNaN(ts) ? ts : DEFAULTS.typingSpeed,
+        responseDelay: Number.isFinite(rd) && !isNaN(rd) ? rd : DEFAULTS.responseDelay
+      };
+    }
+
+    function setReplySettings({typingSpeed, responseDelay}){
+      if(typeof typingSpeed === 'number') localStorage.setItem(KEY_TYPING_SPEED, String(typingSpeed));
+      if(typeof responseDelay === 'number') localStorage.setItem(KEY_RESPONSE_DELAY, String(responseDelay));
+      // update UI if open
+      updateSettingsUI();
+    }
+
+    function applyPreset(name){
+      let cfg = {...DEFAULTS};
+      if(name === 'slow') cfg = { typingSpeed: 48, responseDelay: 900 };
+      if(name === 'normal') cfg = { typingSpeed: 24, responseDelay: 450 };
+      if(name === 'fast') cfg = { typingSpeed: 10, responseDelay: 150 };
+      if(name === 'flash') cfg = { typingSpeed: 4, responseDelay: 40 };
+      setReplySettings(cfg);
+      $('#speedPreset').value = name;
+      showSettingsMsg('Preset diterapkan.');
+    }
+
+    function updateSettingsUI(){
+      const s = getReplySettings();
+      const tsRange = $('#typingSpeedRange');
+      const rdRange = $('#responseDelayRange');
+      const tsVal = $('#typingSpeedVal');
+      const rdVal = $('#responseDelayVal');
+      if(tsRange) tsRange.value = s.typingSpeed;
+      if(rdRange) rdRange.value = s.responseDelay;
+      if(tsVal) tsVal.textContent = s.typingSpeed + 'ms';
+      if(rdVal) rdVal.textContent = s.responseDelay + 'ms';
+    }
+
+    // Helper untuk mengetik karakter dengan efek pop
+let _typingInterval = null;
+function typeReply(text){
+  const node = addBubble('', 'bot');
+  let i = 0;
+  const { typingSpeed } = getReplySettings();
+  if(_typingInterval){
+    clearInterval(_typingInterval);
+    _typingInterval = null;
+  }
+  _typingInterval = setInterval(()=>{
+    let ch = text.charAt(i);
+    // kalau spasi, ganti ke &nbsp; biar tetap tampil
+    const span = document.createElement('span');
+    span.className = 'char';
+    span.innerHTML = (ch === ' ' ? '&nbsp;' : ch);
+    node.appendChild(span);
+
+    if(messages) messages.scrollTop = messages.scrollHeight;
+    i++;
+    if(i >= text.length){
+      clearInterval(_typingInterval);
+      _typingInterval = null;
+    }
+  }, Math.max(3, typingSpeed));
+}
+
+
+
+    /* ========= OPENAI + RATE LIMITER (keep original) ========= */
+
+    const STORAGE_KEY = 'openai_api_key'; // moved up so accessible
+
+    // CONFIG: tweak jika mau — default konservatif supaya 429 kecil kemungkinannya
+    const RATE_PER_MINUTE = 20; // default requests per minute (client-side). Bisa diubah.
+    const CONCURRENCY = 1;      // concurrent requests to OpenAI
+    const MAX_COOLDOWN_MS = 60_000; // max global cooldown on repeated 429s
+
+    // Simple request limiter + queue with adaptive cooldown
+    class RequestLimiter {
+      constructor({ratePerMinute=RATE_PER_MINUTE, concurrency=CONCURRENCY, maxCooldown=MAX_COOLDOWN_MS} = {}){
+        this.ratePerMinute = ratePerMinute;
+        this.tokens = ratePerMinute; // start full
+        this.capacity = ratePerMinute;
+        this.concurrency = concurrency;
+        this.maxCooldown = maxCooldown;
+        this.queue = [];
+        this.running = 0;
+        this.cooldownUntil = 0;
+        this.lastRefill = Date.now();
+        this.refillInterval = 1000; // ms
+        this.tokenPerInterval = ratePerMinute / 60; // per second
+        this._refillTimer = setInterval(()=> this._refill(), this.refillInterval);
+      }
+      _refill(){
+        const now = Date.now();
+        const elapsedSec = Math.max(0, (now - this.lastRefill)/1000);
+        if(elapsedSec <= 0) return;
+        this.lastRefill = now;
+        this.tokens = Math.min(this.capacity, this.tokens + elapsedSec * this.tokenPerInterval);
+        this._tryProcess();
+      }
+      async request(fn){
+        return new Promise((resolve,reject)=>{
+          this.queue.push({fn, resolve, reject});
+          this._tryProcess();
+        });
+      }
+      _tryProcess(){
+        if(this.running >= this.concurrency) return;
+        if(this.queue.length === 0) return;
+        if(Date.now() < this.cooldownUntil) return; // global cooldown active
+        if(this.tokens < 1) return; // not enough rate budget yet
+        const item = this.queue.shift();
+        if(!item) return;
+        this.tokens -= 1;
+        this.running++;
+        (async ()=>{
+          try{
+            const res = await item.fn();
+            item.resolve(res);
+          }catch(err){
+            item.reject(err);
+          }finally{
+            this.running--;
+            // try next tick
+            setTimeout(()=> this._tryProcess(), 0);
+          }
+        })();
+      }
+      // Called when server returns 429 repeatedly -> trigger global cooldown
+      triggerCooldown(baseMs=1000){
+        const now = Date.now();
+        const prev = Math.max(0, this.cooldownUntil - now);
+        // exponential add: if already on cooldown, double remaining (up to max)
+        let next = Math.min(this.maxCooldown, Math.max(baseMs, prev * 2 || baseMs));
+        // ensure at least baseMs
+        if(next < baseMs) next = baseMs;
+        this.cooldownUntil = now + next;
+        console.warn(`RequestLimiter: applied global cooldown ${next}ms (until ${new Date(this.cooldownUntil).toISOString()})`);
+      }
+      shutdown(){
+        clearInterval(this._refillTimer);
+      }
+    }
+
+    const limiter = new RequestLimiter({ratePerMinute: RATE_PER_MINUTE, concurrency: CONCURRENCY, maxCooldown: MAX_COOLDOWN_MS});
+
+    // helper sleep
+    function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+    async function callOpenAI(prompt, {model='gpt-3.5-turbo', timeoutMs=60000} = {}){
+      const key = localStorage.getItem(STORAGE_KEY) || '';
+      if(!key) throw new Error('NO_API_KEY');
+
+      const payload = {
+        model,
+        messages: [{role:'user', content: prompt}],
+        temperature: 0.7,
+        max_tokens: 1024,
+        n: 1,
+      };
+
+      const controller = new AbortController();
+      const id = setTimeout(()=> controller.abort(), timeoutMs);
+
+      try{
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + key
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(id);
+
+        if(!res.ok){
+          // parse body if possible
+          let bodyText = '';
+          try{
+            const ct = res.headers.get('content-type') || '';
+            if(ct.includes('application/json')){
+              const j = await res.json();
+              bodyText = j?.error?.message || JSON.stringify(j);
+            }else{
+              bodyText = await res.text();
+            }
+          }catch(e){ bodyText = res.statusText || '' }
+
+          const msg = `HTTP ${res.status} ${res.statusText}${bodyText? ': '+bodyText : ''}`;
+          const e = new Error(msg);
+          e.status = res.status;
+          throw e;
+        }
+
+        const data = await res.json();
+        const out = (data.choices && data.choices[0] && (data.choices[0].message?.content || data.choices[0].text)) || data.output?.text || '';
+        return out;
+      }catch(err){
+        if(err.name === 'AbortError'){
+          const e = new Error('TIMEOUT'); e.status = 408; throw e;
+        }
+        throw err;
+      }
+    }
+
+    // retry wrapper: when key present, try limited retries on 429 but DO NOT fallback to mock.
+    async function callOpenAIWithRetries(prompt, opts){
+      const maxRetries = 3; // try up to 3 retries (total attempts = maxRetries + 1)
+      let attempt = 0;
+      while(true){
+        try{
+          // Execute the actual network call
+          return await callOpenAI(prompt, opts);
+        }catch(err){
+          const status = err && (err.status || (typeof err.status === 'number' && err.status));
+          // If 429 and we still have retries, wait exponential backoff and retry
+          if(status === 429 && attempt < maxRetries){
+            const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, ...
+            console.warn(`OpenAI rate limit (429). Retrying in ${delay}ms — attempt ${attempt+1}/${maxRetries}`);
+            // Also notify limiter to slightly slow future requests if this happens often
+            limiter.triggerCooldown(delay * 0.9);
+            await sleep(delay + Math.floor(Math.random()*200));
+            attempt++;
+            continue;
+          }
+          // If exhausted retries for 429, trigger stronger global cooldown and throw a clear error
+          if(status === 429){
+            limiter.triggerCooldown(2000 * Math.pow(2, attempt)); // larger backoff
+            const e = new Error('RATE_LIMIT_EXCEEDED'); e.status = 429; throw e;
+          }
+          throw err;
+        }
+      }
+    }
+
+    function showErrorBubble(msg){
+      const text = msg && String(msg).trim() ? msg : 'Terjadi kesalahan tak terduga.';
+      addBubble(`<strong>Terjadi kesalahan:</strong> ${sanitize(text)}`, 'bot');
+    }
+
+    // send() will always use OpenAI when key exists. No fallback to mock when key is present.
+    async function send(){
+      const v = input && input.value;
+      if(!v || !v.trim()) { clickSfx(); return }
+      sendSfx();
+      addBubble(sanitize(v), 'user');
+      if(input) input.value='';
+      const thinking = addBubble('⏳ Mengetik…','bot');
+
+      const key = localStorage.getItem(STORAGE_KEY) || '';
+      if(!key){
+        // No API key: use local mock so app remains usable
+        const { responseDelay } = getReplySettings();
+        setTimeout(()=>{
+          thinking.remove();
+          const reply = mockAI(v);
+          typeReply(reply);
+        }, Math.max(0, responseDelay + Math.floor(Math.random()*200)));
+        return;
+      }
+
+      try{
+        // Important: enqueue the OpenAI call through our limiter to avoid bursty traffic
+        const replyText = await limiter.request(() => callOpenAIWithRetries(v, {model: 'gpt-3.5-turbo', timeoutMs: 60000}));
+        thinking.remove();
+        if(!replyText || !replyText.trim()){
+          showErrorBubble('OpenAI mengembalikan jawaban kosong.');
+          return;
+        }
+        // when real response arrives, respect responseDelay to feel natural
+        const { responseDelay } = getReplySettings();
+        setTimeout(()=> typeReply(replyText), Math.max(0, responseDelay));
+      }catch(err){
+        thinking.remove();
+        const msg = err && err.message ? err.message : String(err || 'Unknown error');
+        if(err && err.message === 'NO_API_KEY'){
+          showErrorBubble('Tidak ada API key terdeteksi. Buka Pengaturan dan simpan API keymu.');
+        }else if(err && err.message === 'TIMEOUT'){
+          showErrorBubble('Permintaan ke OpenAI timeout (lebih dari 60s).');
+        }else if(err && (err.status === 401 || /invalid api key/i.test(msg))){
+          showErrorBubble('API key tidak valid (401). Pastikan key benar dan aktif.');
+        }else if(err && (err.status === 429 || err.message === 'RATE_LIMIT_EXCEEDED')){
+          // Important: per user's request, DO NOT fallback to mock when key is present. Show clear error and stop.
+          showErrorBubble('Rate limit terlampaui (429). Sistem otomatis memperlambat permintaan. Mohon cek kuota/usage atau kurangi frekuensi panggilan.');
+        }else if(/Failed to fetch|NetworkError/i.test(msg)){
+          showErrorBubble('Gagal terhubung ke OpenAI — kemungkinan masalah jaringan atau CORS.');
+        }else{
+          showErrorBubble(msg || 'Terjadi kesalahan tak terduga.');
+        }
+        console.error('OpenAI error:', err);
+      }
+    }
+
+    sendBtn && sendBtn.addEventListener('click', (e)=>{ ripple(sendBtn,e); send(); });
+    clearBtn && clearBtn.addEventListener('click', (e)=>{ ripple(clearBtn,e); clickSfx(); if(messages) messages.innerHTML=''; addBubble('Percakapan dibersihkan. Mulai lagi ya. ✨','bot'); });
+    input && input.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send() }
+    });
+
+    /* ========= MUSIC TOGGLE ========= */
+    const musicBtn = $('#musicBtn');
+    const bgMusic = $('#bgMusic');
+    let musicPlaying = false;
+
+    musicBtn && musicBtn.addEventListener('click', (e) => {
+      ripple(musicBtn, e); clickSfx();
+      if (!musicPlaying) {
+        bgMusic.play().catch(()=>{ /* ignore autoplay errors */ });
+        musicBtn.innerHTML = '⏸ Hentikan <span class="rip"></span>';
+        musicPlaying = true;
+      } else {
+        bgMusic.pause();
+        musicBtn.innerHTML = '🎵 Musik <span class="rip"></span>';
+        musicPlaying = false;
+      }
+    });
+
+    /* ========= SETTINGS (API KEY + reply speed) ========= */
+    const settingsBtn = $('#settingsBtn');
+    const settingsBackdrop = $('#settingsBackdrop');
+    const apiKeyInput = $('#apiKeyInput');
+    const toggleShow = $('#toggleShow');
+    const saveApiBtn = $('#saveApiBtn');
+    const clearApiBtn = $('#clearApiBtn');
+    const copyApiBtn = $('#copyApiBtn');
+    const simulate429Btn = $('#simulate429Btn');
+    const closeSettingsBtn = $('#closeSettingsBtn');
+    const settingsMsg = $('#settingsMsg');
+
+    // reply speed controls
+    const speedPreset = $('#speedPreset');
+    const typingSpeedRange = $('#typingSpeedRange');
+    const responseDelayRange = $('#responseDelayRange');
+    const typingSpeedVal = $('#typingSpeedVal');
+    const responseDelayVal = $('#responseDelayVal');
+    const resetSpeedBtn = $('#resetSpeedBtn');
+
+    // open modal
+    function openSettings(ev){
+      if(ev) ripple(settingsBtn, ev);
+      clickSfx();
+      populateApiInput();
+      updateSettingsUI();
+      settingsBackdrop.classList.add('show');
+      settingsBackdrop.setAttribute('aria-hidden','false');
+      setTimeout(()=> apiKeyInput.focus(), 120);
+    }
+
+    function closeSettings(){
+      settingsBackdrop.classList.remove('show');
+      settingsBackdrop.setAttribute('aria-hidden','true');
+      settingsMsg.textContent = '';
+    }
+
+    function populateApiInput(){
+      const val = localStorage.getItem(STORAGE_KEY) || '';
+      apiKeyInput.value = val;
+      apiKeyInput.type = 'password';
+    }
+
+    function showSettingsMsg(txt, short=true){
+      settingsMsg.textContent = txt;
+      if(short) setTimeout(()=>{ settingsMsg.textContent = ''; }, 3200);
+    }
+
+    settingsBtn && settingsBtn.addEventListener('click', openSettings);
+    closeSettingsBtn && closeSettingsBtn.addEventListener('click', (e)=>{ ripple(closeSettingsBtn,e); clickSfx(); closeSettings(); });
+    settingsBackdrop && settingsBackdrop.addEventListener('click', (e)=>{
+      if(e.target === settingsBackdrop) { clickSfx(); closeSettings(); }
+    });
+
+    // prevent clicks inside modal from closing
+    const modalEl = $('.modal');
+    if(modalEl) modalEl.addEventListener('click', (e)=> e.stopPropagation());
+
+    // toggle show/hide API value
+    toggleShow && toggleShow.addEventListener('click', (e)=>{
+      ripple(toggleShow, e); clickSfx();
+      if(apiKeyInput.type === 'password') { apiKeyInput.type = 'text'; toggleShow.textContent = '🙈'; }
+      else { apiKeyInput.type = 'password'; toggleShow.textContent = '👁️'; }
+      apiKeyInput.focus();
+    });
+
+    // save key
+    saveApiBtn && saveApiBtn.addEventListener('click', (e)=>{
+      ripple(saveApiBtn, e); clickSfx();
+      const v = apiKeyInput.value.trim();
+      if(!v){
+        localStorage.removeItem(STORAGE_KEY);
+        showSettingsMsg('API key dihapus (kosong).');
+        return;
+      }
+      // basic sanity check: starts with sk- (common OpenAI key pattern) — not mandatory but helpful
+      if(!/^sk-/.test(v)){
+        // still allow, but warn
+        localStorage.setItem(STORAGE_KEY, v);
+        showSettingsMsg('Disimpan, tapi sebaiknya key dimulai dengan "sk-".');
+        successSfx();
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, v);
+      showSettingsMsg('API key tersimpan ✅');
+      successSfx();
+    });
+
+    // clear key button
+    clearApiBtn && clearApiBtn.addEventListener('click', (e)=>{
+      ripple(clearApiBtn, e); clickSfx();
+      localStorage.removeItem(STORAGE_KEY);
+      apiKeyInput.value = '';
+      showSettingsMsg('API key dihapus.');
+    });
+
+    // copy key to clipboard (masked if hidden)
+    copyApiBtn && copyApiBtn.addEventListener('click', async (e)=>{
+      ripple(copyApiBtn, e); clickSfx();
+      const val = localStorage.getItem(STORAGE_KEY) || apiKeyInput.value || '';
+      if(!val){
+        showSettingsMsg('Belum ada API key untuk disalin.');
+        return;
+      }
+      try{
+        await navigator.clipboard.writeText(val);
+        showSettingsMsg('API key disalin ke clipboard.');
+        successSfx();
+      }catch(err){
+        showSettingsMsg('Gagal menyalin: izinkan akses clipboard.');
+      }
+    });
+
+    // typing/reply UI interactions
+    if(speedPreset) speedPreset.addEventListener('change', (e)=>{ applyPreset(e.target.value); });
+    if(typingSpeedRange) typingSpeedRange.addEventListener('input', (e)=>{
+  const v = parseInt(e.target.value);
+  typingSpeedVal.textContent = v;
+  localStorage.setItem(KEY_TYPING_SPEED, String(v));
+  });
+    
+    if(responseDelayRange) responseDelayRange.addEventListener('input', (e)=>{
+  const v = parseInt(e.target.value);
+  responseDelayVal.textContent = v;
+  localStorage.setItem(KEY_RESPONSE_DELAY, String(v));
+});
+    if(resetSpeedBtn) resetSpeedBtn.addEventListener('click', (e)=>{ ripple(resetSpeedBtn,e); clickSfx(); applyPreset('normal'); });
+
+    // keyboard shortcuts: Esc closes
+    window.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Escape'){
+        if(settingsBackdrop.classList.contains('show')){ closeSettings(); clickSfx(); }
+        else hideZgptToast();
+      }
+    });
+
+    /* ========= zGPT button behavior ========= */
+    const zgptBtn = $('#zgptBtn');
+    const zgptToast = $('#zgptToast');
+    const zgptClose = $('#zgptClose');
+
+    function showZgptToast(){
+      if(!zgptToast || !zgptBtn) return;
+      zgptToast.classList.add('show');
+      zgptToast.setAttribute('aria-hidden','false');
+      zgptBtn.setAttribute('aria-expanded','true');
+      clickSfx();
+      window.zgptHideTimeout && clearTimeout(window.zgptHideTimeout);
+      window.zgptHideTimeout = setTimeout(hideZgptToast, 7000);
+    }
+    function hideZgptToast(){
+      if(!zgptToast || !zgptBtn) return;
+      zgptToast.classList.remove('show');
+      zgptToast.setAttribute('aria-hidden','true');
+      zgptBtn.setAttribute('aria-expanded','false');
+      window.zgptHideTimeout && clearTimeout(window.zgptHideTimeout);
+    }
+
+    zgptBtn && zgptBtn.addEventListener('click', (e)=>{
+      // ripple visual
+      const span = document.createElement('span');
+      span.style.position = 'absolute';
+      span.style.left = '50%'; span.style.top = '50%';
+      span.style.width = '8px'; span.style.height = '8px';
+      span.style.borderRadius = '50%'; span.style.background = 'rgba(255,255,255,0.12)';
+      span.style.transform = 'translate(-50%,-50%) scale(0)';
+      span.style.transition = 'transform .4s ease, opacity .4s ease';
+      zgptBtn.appendChild(span);
+      requestAnimationFrame(()=>{ span.style.transform = 'translate(-50%,-50%) scale(14)'; span.style.opacity = '0'; });
+      setTimeout(()=>span.remove(),420);
+
+      showZgptToast();
+    });
+
+    zgptClose && zgptClose.addEventListener('click', hideZgptToast);
+
+    // close if clicked outside toast & button
+    document.addEventListener('click', (e)=>{
+      const target = e.target;
+      if(!zgptToast || !zgptBtn) return;
+      if(zgptToast.classList.contains('show')){
+        if(!zgptToast.contains(target) && !zgptBtn.contains(target)){
+          hideZgptToast();
+        }
+      }
+    });
+
+    // small safety: ensure API input can't be accidentally submitted by Enter (so it doesn't send chat)
+    if(apiKeyInput) apiKeyInput.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ e.preventDefault(); saveApiBtn.click(); }
+    });
+
+    // load existing key into UI on start (so user sees it's stored if reopening modal)
+    (function init(){
+      populateApiInput();
+      // ensure reply settings exist
+      if(!localStorage.getItem(KEY_TYPING_SPEED)) localStorage.setItem(KEY_TYPING_SPEED, String(DEFAULTS.typingSpeed));
+      if(!localStorage.getItem(KEY_RESPONSE_DELAY)) localStorage.setItem(KEY_RESPONSE_DELAY, String(DEFAULTS.responseDelay));
+      updateSettingsUI();
+    })();
+
+    /* ======= End of script ====== */
+  </script>
+</body>
+</html>
