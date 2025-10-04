@@ -1,0 +1,2572 @@
+<!DOCTYPE html> 
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DustineGPT</title>
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" type="image/jpg" href="favicon.jpg">
+  <style>
+    :root{
+      --bg:#0a0a0a;           /* black base */
+      --fg:#fafafa;           /* white text */
+      --muted:#9ca3af;        /* gray */
+      --accent:#ffffff;       /* keep BW theme */
+      --card:#111113;         /* dark card */
+      --ring:rgba(255,255,255,.16);
+      --glass:rgba(255,255,255,.06);
+      --shadow:0 10px 30px rgba(0,0,0,.45);
+      --radius:18px;          /* rounded buttons, cards */
+      --grad1:#8a2be2; /* ungu */
+      --grad2:#0b3bff; /* biru tua */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--fg);
+      overflow:hidden;
+    }
+    /* ====== BACKGROUND: gradient + twinkling stars ====== */
+    .sky{
+      position:fixed; inset:0; z-index:-2; overflow:hidden;
+      background:
+        radial-gradient(1200px 800px at 80% 10%, rgba(25, 0, 255, 0.22), transparent 60%),
+        radial-gradient(1000px 700px at 10% 90%, rgba(140,0,255,.28), transparent 60%),
+        linear-gradient(160deg, #0b0220 0%, #060616 50%, #04040b 100%);
+    }
+    canvas.stars{position:absolute; inset:0; width:100%; height:100%; display:block;}
+
+    /* ====== SPLASH: logo intro -> loading screen ====== */
+    #splash{position:fixed; inset:0; display:grid; place-items:center; background:transparent; z-index:50;}
+    .splash-inner{display:grid; gap:28px; place-items:center; text-align:center;}
+
+    .logo{
+      width:160px; height:160px; border-radius:32px; padding:18px;
+      background:linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+      box-shadow: var(--shadow), inset 0 0 0 1px var(--ring);
+      display:grid; place-items:center;
+      transform: translateY(6px);
+      animation: floaty 3s ease-in-out infinite;
+      transform-origin:center;
+      will-change: transform, border-radius;
+    }
+    @keyframes floaty{0%,100%{transform:translateY(6px)}50%{transform:translateY(-6px)}}
+
+    .mark{width:96px; height:96px;}
+    .mark path{fill:none; stroke:#fff; stroke-width:8; stroke-linecap:round; stroke-linejoin:round;
+      filter: drop-shadow(0 4px 10px rgba(255,255,255,.12));
+      stroke-dasharray: 420; stroke-dashoffset: 420; animation: draw 1.6s ease forwards;
+    }
+    @keyframes draw{to{stroke-dashoffset:0}}
+
+    .loader{width:min(520px, 80vw); background:rgba(255,255,255,.06); border-radius:999px; padding:6px; box-shadow:inset 0 0 0 1px var(--ring);}    
+    .bar{height:14px; width:0%; border-radius:999px; background: linear-gradient(90deg, rgba(255,255,255,.9), rgba(255,255,255,.65)); box-shadow:0 8px 22px rgba(255,255,255,.18); transition:width .12s linear}
+    .loading-label{font-size:14px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase}
+    /* UPDATED: animated tip styles */
+    .loading-tip{font-size:13px; color:var(--muted); max-width:520px; padding:0 12px; opacity:0; transform:translateY(6px); transition:opacity .5s ease, transform .5s ease;}
+    .loading-tip.visible{opacity:1; transform:translateY(0);}
+
+    /* Start button (ditambahkan) - dibuat lebih gelap, animasi tambahan */
+    .start-btn{
+      padding:14px 28px;
+      font-weight:800;
+      font-size:16px;
+      border-radius:14px;
+      border:0;
+      cursor:pointer;
+      user-select:none;
+      /* lebih redup: subtler gradient untuk tidak terlalu terang */
+      background: linear-gradient(90deg, rgba(138,43,226,0.12), rgba(11,59,255,0.10));
+      color:#fff;
+      /* lembutkan bayangan supaya tidak 'menyala' */
+      box-shadow: 0 10px 30px rgba(11,59,255,0.06), inset 0 -6px 16px rgba(0,0,0,0.45);
+      transition: transform .28s cubic-bezier(.2,.9,.3,1), opacity .28s ease, filter .18s ease, box-shadow .28s ease;
+      outline: none;
+      display:inline-grid;
+      place-items:center;
+      gap:8px;
+      filter: brightness(0.88);
+      position:relative;
+      overflow:hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .start-btn.hidden{
+      opacity:0;
+      transform: translateY(14px) scale(.98);
+      pointer-events:none;
+    }
+
+    .start-btn:not(.hidden){
+      opacity:1;
+      transform: translateY(0) scale(1);
+      pointer-events:auto;
+      animation: popIn .62s cubic-bezier(.2,.9,.3,1);
+      will-change: transform, box-shadow;
+    }
+
+    @keyframes popIn{
+      0%{opacity:0; transform:translateY(12px) scale(.94)}
+      60%{transform:translateY(-8px) scale(1.03)}
+      100%{transform:translateY(0) scale(1)}
+    }
+
+    /* very subtle idle breathe to add life without being distracting */
+    @keyframes breathe{
+      from{transform:translateY(0) scale(1)}
+      to{transform:translateY(-1.6px) scale(1.006)}
+    }
+
+    /* entrance ring pulse (one-shot) */
+    .start-btn::after{
+      content:'';
+      position:absolute; inset: -6px; border-radius:12px;
+      box-shadow: 0 0 0 0 rgba(11,59,255,0.06);
+      pointer-events:none;
+    }
+    .start-btn.show-ring::after{ animation: ringPulse .9s ease-out; }
+    @keyframes ringPulse{ 0%{box-shadow:0 0 0 0 rgba(11,59,255,0.12);} 40%{box-shadow:0 0 30px 10px rgba(11,59,255,0.06);} 100%{box-shadow:0 0 0 0 rgba(11,59,255,0);} }
+
+    /* subtle shine that moves across on hover */
+    .start-btn::before{
+      content:'';
+      position:absolute;
+      top:-30%; left:-40%;
+      width:40%; height:160%;
+      background: linear-gradient(120deg, rgba(255,255,255,0.02), rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+      transform: rotate(18deg) translateX(-120%);
+      transition: transform .9s ease;
+      pointer-events:none;
+      mix-blend-mode:overlay;
+    }
+    .start-btn:hover{ transform: translateY(-2px) scale(1.04); filter: brightness(1.01); box-shadow: 0 16px 40px rgba(11,59,255,0.09); }
+    .start-btn:hover::before{ transform: rotate(18deg) translateX(120%); }
+
+    /* pressed state for crisp feedback */
+    .start-btn.pressed{ transform: scale(.96); transition: transform .12s cubic-bezier(.2,.9,.3,1); box-shadow: 0 6px 18px rgba(11,59,255,0.06), inset 0 -10px 24px rgba(0,0,0,0.5); }
+    .start-btn.pressed::before{ transform: rotate(18deg) translateX(120%); }
+
+    /* tiny ripple element created on click */
+    .start-btn .btn-ripple{ position:absolute; border-radius:50%; transform: translate(-50%,-50%) scale(0); opacity:0.6; pointer-events:none; }
+
+    /* combine entrance + a single gentle breathe to keep it alive */
+    .start-btn:not(.hidden) { animation: popIn .62s cubic-bezier(.2,.9,.3,1), breathe 6s ease-in-out 0.9s 1; }
+
+    /* Zooming splash effect when start pressed (fullscreen zoom) */
+    .splash.zooming{ pointer-events:none; overflow:hidden; }
+    .splash.zooming .loader,
+    .splash.zooming .loading-label,
+    .splash.zooming .loading-tip,
+    .splash.zooming #startBtn { opacity:0; transform: translateY(12px) scale(.98); transition: opacity .32s ease, transform .6s ease; }
+
+    /* zoom overlay (burst) */
+    .zoom-burst{
+      position:fixed; z-index:9999; pointer-events:none; border-radius:50%; transform:translate(-50%,-50%) scale(0); transition:transform .78s cubic-bezier(.2,.9,.3,1), opacity .5s ease; background: radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(11,59,255,0.06)); will-change: transform, opacity;}
+
+    /* Fade in app when ready */
+    #app{opacity:0; pointer-events:none; transition:opacity .5s ease; z-index:10;}
+    #app.ready{opacity:1; pointer-events:auto}
+
+    /* ====== APP LAYOUT ====== */
+    .container{display:grid; grid-template-rows:auto 1fr auto; height:100vh;}
+    header{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; backdrop-filter: blur(6px); background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)); border-bottom:1px solid var(--ring)}
+    .brand{display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.02em}
+    .brand .mini{width:28px; height:28px; display:grid; place-items:center; border-radius:10px; background:rgba(255,255,255,.09); box-shadow:inset 0 0 0 1px var(--ring)}
+    .brand .name{font-size:16px}
+
+    main{display:grid; grid-template-columns:1fr; max-width:1100px; margin:0 auto; width:100%; gap:16px; padding:18px;}
+
+    /* Chat panel */
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid var(--ring); border-radius:var(--radius); box-shadow: var(--shadow); display:grid; grid-template-rows: 1fr auto; overflow:hidden; min-height:58vh; position:relative}
+    .messages{padding:20px; overflow:auto; scroll-behavior:smooth; height:100%}
+    .bubble{max-width:80%; padding:12px 14px; margin:10px 0; border-radius:18px; line-height:1.4; backdrop-filter: blur(4px)}
+    .bot{background:rgba(255,255,255,.06); border:1px solid var(--ring)}
+    .user{background:#ffffff; color:#0b0b0b; justify-self:end}
+    .row{display:flex; align-items:center; gap:10px}
+
+    /* Composer */
+    .composer{display:flex; gap:10px; padding:12px; background:rgba(255,255,255,.03); border-top:1px solid var(--ring)}
+    .input{flex:1; padding:14px 16px; background:#0f0f12; color:var(--fg); border:1px solid var(--ring); border-radius:16px; outline:none; transition: box-shadow .2s ease, transform .2s ease}
+    .input:focus{box-shadow:0 0 0 6px rgba(255,255,255,.06)}
+
+    .btn{position:relative; display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:12px 18px; border:1px solid var(--ring); background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06)); color:#0b0b0b; font-weight:700; letter-spacing:.02em; border-radius:999px; cursor:pointer; user-select:none; box-shadow: var(--shadow), inset 0 -6px 14px rgba(0,0,0,0.2); transition: transform .14s ease, filter .18s ease, box-shadow .2s ease}
+    .btn:hover{transform: translateY(-1px)}
+    .btn:active{transform: translateY(1px) scale(.98)}
+    .btn .rip{position:absolute; inset:0; border-radius:999px; overflow:hidden; pointer-events:none}
+    .btn .rip span{position:absolute; width:12px; height:12px; border-radius:999px; background:rgba(255,255,255,.7); transform:translate(-50%,-50%) scale(0); animation:ripple .6s ease-out forwards}
+    @keyframes ripple{to{transform:translate(-50%,-50%) scale(18); opacity:0}}
+
+    /* Utility */
+    .hidden{display:none !important}
+
+    /* mobile tweaks */
+    @media(max-width:640px){
+      .bubble{max-width:92%}
+      .loader{width:86vw}
+    }
+
+    /* ====== Modern scrollbar styling (webkit + firefox) ====== */
+    .messages::-webkit-scrollbar{ width:12px; }
+    .messages::-webkit-scrollbar-track{ background: transparent; margin:8px 0; border-radius:999px; }
+    .messages::-webkit-scrollbar-thumb{
+      background: linear-gradient(180deg,var(--grad2),var(--grad1));
+      border-radius:999px; min-height:36px; border:2px solid rgba(0,0,0,0.18);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.35);
+    }
+    /* macOS/Firefox */
+    .messages{scrollbar-width:thin; scrollbar-color: rgba(138,43,226,0.9) transparent; }
+
+    /* Floating scroll-to-bottom button */
+    .scroll-to-bottom{
+      position:absolute; right:18px; bottom:86px; z-index:999;
+      width:46px;height:46px;border-radius:999px;
+      display:grid;place-items:center;
+      background:linear-gradient(90deg,var(--grad2),var(--grad1));
+      border:1px solid rgba(255,255,255,0.08); box-shadow:0 12px 28px rgba(11,59,255,0.12);
+      color:#fff; font-weight:800; cursor:pointer; transform:translateY(8px);
+      opacity:0; pointer-events:none; transition:all .18s ease;
+    }
+    .scroll-to-bottom.show{ opacity:1; pointer-events:auto; transform:translateY(0); }
+
+    /* ====== zGPT badge (pojok kanan bawah) as button ====== */
+    .zgpt-badge{
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 99999;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 2px 10px rgba(124,77,255,0.06);
+      cursor: pointer;
+      transform-origin: center;
+      transition: transform .18s ease, box-shadow .18s ease;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      outline: none;
+    }
+    .zgpt-badge:focus { box-shadow: 0 0 0 4px rgba(138,43,226,0.12); transform: translateY(-3px) scale(1.01); }
+    .zgpt-badge:hover{ transform: translateY(-4px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.7), 0 0 30px rgba(124,77,255,0.12); }
+
+    .zgpt-text{
+      font-weight:800;
+      font-size:12px;
+      letter-spacing:.06em;
+      background: linear-gradient(90deg,var(--grad1),var(--grad2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display:inline-block;
+      padding:2px 0;
+    }
+
+    /* soft pulse glow */
+    @keyframes pulse-glow{
+      0%{box-shadow:0 0 0 0 rgba(138,43,226,0.08);} 
+      50%{box-shadow:0 0 30px 8px rgba(11,59,255,0.04);} 
+      100%{box-shadow:0 0 0 0 rgba(138,43,226,0.08);} 
+    }
+    .zgpt-badge::after{
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 999px;
+      pointer-events: none;
+      animation: pulse-glow 3.6s infinite;
+      opacity: 0.9;
+    }
+
+    /* toast / modal kecil */
+    .zgpt-toast{
+      position: fixed;
+      right: 18px;
+      bottom: 76px; /* sits just above the badge */
+      z-index: 100000;
+      min-width: 280px;
+      max-width: 420px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+      padding: 12px 14px;
+      color: var(--fg);
+      transform-origin: bottom right;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px) scale(.98);
+      transition: opacity .22s ease, transform .22s ease;
+      backdrop-filter: blur(8px);
+    }
+    .zgpt-toast.show{
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+    .zgpt-toast .title{
+      font-weight:700;
+      font-size:13px;
+      margin-bottom:6px;
+      background: linear-gradient(90deg,var(--grad1),var(--grad2));
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+    .zgpt-toast .msg{ font-size:13px; color: var(--fg); line-height:1.38; }
+    .zgpt-toast .close{
+      position:absolute;
+      top:8px;
+      right:8px;
+      background:transparent;
+      border:0;
+      color:var(--muted);
+      font-size:14px;
+      cursor:pointer;
+    }
+
+    @media(max-width:520px){
+      .zgpt-toast{ right: 10px; left: 10px; bottom: 70px; max-width: unset; min-width: unset; }
+      .zgpt-badge{ right: 12px; bottom: 12px; }
+    }
+
+    /* ====== Settings modal ====== */
+    .modal-backdrop{
+      position:fixed; inset:0; z-index:120000; display:none; align-items:center; justify-content:center; padding:20px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.45));
+      backdrop-filter: blur(6px);
+    }
+    .modal-backdrop.show { display:flex; }
+    .modal{
+      width: min(520px, 96vw); background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border:1px solid var(--ring); border-radius:14px; padding:18px; box-shadow:var(--shadow); position:relative;
+    }
+    .modal h3{ margin:0 0 10px 0; font-size:18px }
+    .field{ display:flex; gap:8px; align-items:center; margin-top:12px }
+    .field input[type="password"]{ flex:1; padding:10px 12px; border-radius:10px; background:#0f0f12; border:1px solid var(--ring); color:var(--fg); }
+    .modal .hint{ font-size:13px; color:var(--muted); margin-top:8px }
+    .modal .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px }
+    .micro-msg{ font-size:13px; color:var(--muted); margin-top:8px; min-height:18px }
+
+    /* small btn variant for settings row */
+    .btn-sm{ padding:8px 12px; font-weight:700; border-radius:10px; font-size:13px }
+
+    /* slider styles */
+    .slider-row{ display:flex; align-items:center; gap:12px; margin-top:10px }
+    .slider-row input[type=range]{ flex:1 }
+    .small{ font-size:13px; color:var(--muted) }
+
+    /* Tombol tutup posisi pojok kanan atas modal pengaturan */
+  .modal .btn-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+
+  /* === Fancy glow sliders === */
+  .fancy-slider{
+    -webkit-appearance:none;
+    width:100%;
+    height:12px;
+    border-radius:999px;
+    background:linear-gradient(90deg,var(--grad1),var(--grad2));
+    box-shadow:0 0 8px rgba(138,43,226,.45);
+    outline:none;
+    animation:glowPulse 4s ease-in-out infinite;
+    cursor:pointer;
+  }
+  @keyframes glowPulse {
+    0%,100%{ box-shadow:0 0 8px rgba(138,43,226,.45); }
+    50%    { box-shadow:0 0 16px rgba(11,59,255,.45); }
+  }
+  .fancy-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:#fff;
+    border:3px solid var(--grad1);
+    transition:transform .15s,border-color .15s;
+  }
+  .fancy-slider:active::-webkit-slider-thumb{
+    transform:scale(1.1);
+    border-color:var(--grad2);
+  }
+  .fancy-slider::-moz-range-thumb{
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:#fff;
+    border:3px solid var(--grad1);
+    transition:transform .15s,border-color .15s;
+  }
+  .fancy-slider:active::-moz-range-thumb{
+    transform:scale(1.1);
+    border-color:var(--grad2);
+  }
+
+  /* Efek pop untuk karakter saat diketik */
+  @keyframes pop {
+    from { transform: scale(0.6); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .char {
+    display:inline-block;
+    animation: pop 0.22s ease;
+  }
+
+  /* ======= NEW: Music achievement (left-bottom) ======= */
+  .music-toast{
+    position: fixed;
+    left: 18px;
+    bottom: 18px;
+    z-index: 100001;
+    min-width: 260px;
+    max-width: 420px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+    padding: 12px 14px;
+    color: var(--fg);
+    transform-origin: bottom left;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-12px) translateY(8px) scale(.98);
+    transition: opacity .28s ease, transform .28s cubic-bezier(.2,.9,.3,1);
+    display:flex;
+    gap:12px;
+    align-items:center;
+    backdrop-filter: blur(8px);
+    font-size:13px;
+  }
+  .music-toast.show{
+    opacity:1;
+    pointer-events:auto;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+  .music-toast .icon{
+    width:46px; height:46px; border-radius:12px; display:grid; place-items:center;
+    background: linear-gradient(90deg,var(--grad1),var(--grad2));
+    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+    font-weight:800;
+    font-size:18px;
+  }
+  .music-toast .body{ display:flex; flex-direction:column; gap:4px; }
+  .music-toast .title{ font-weight:800; font-size:14px; line-height:1; color:var(--fg); }
+  .music-toast .sub{ font-size:12px; color:var(--muted); }
+  .music-toast .close-btn{ background:transparent; border:0; color:var(--muted); font-size:14px; cursor:pointer; margin-left:6px; }
+
+  @media(max-width:520px){
+    .music-toast{ left: 10px; right: 10px; bottom: 70px; max-width: unset; min-width: unset; }
+  }
+ 
+/* enhanced music dropdown */
+.dropdown{
+  position:fixed; /* we'll position it with JS so it's viewport-fixed */
+  left:0; top:0;
+  min-width:220px;
+  max-width:320px;
+  padding:8px;
+  border-radius:12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.02));
+  backdrop-filter: blur(10px) saturate(120%);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 18px 50px rgba(2,6,23,0.7), 0 6px 18px rgba(124,77,255,0.06);
+  transform-origin: top center;
+  transform: translateY(-8px) scale(.98);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 120000;
+  transition: transform .28s cubic-bezier(.2,.9,.3,1), opacity .22s ease, box-shadow .22s ease;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+/* when opened */
+.dropdown.open{
+  transform: translateY(6px) scale(1);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* items */
+.dropdown-item{
+  padding:10px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:600;
+  color:var(--fg);
+  transition: background .14s ease, transform .12s ease;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  outline: none;
+}
+
+/* hover / focus */
+.dropdown-item:hover,
+.dropdown-item:focus{
+  background: linear-gradient(90deg, rgba(138,43,226,0.08), rgba(11,59,255,0.06));
+  transform: translateX(6px);
+  box-shadow: 0 6px 18px rgba(11,59,255,0.04) inset;
+}
+
+/* small divider optional */
+.dropdown .divider{
+  height:1px;
+  background: rgba(255,255,255,0.03);
+  margin:4px 0;
+}
+
+/* mobile safety */
+@media(max-width:640px){
+  .dropdown{ left:8px !important; right:8px !important; top:auto !important; bottom:80px !important; transform-origin: bottom center; }
+}
+
+.dropdown.hidden{display:none;}
+.dropdown-item{
+  padding:10px 14px;
+  cursor:pointer;
+  transition:background .16s ease;
+}
+.dropdown-item:hover{
+  background:rgba(255,255,255,0.10);
+}
+/* ====== DOWNLOAD BUTTON (SVG) - INSERT HERE ====== */
+/* non-intrusive layout + accessible text */
+#musicDropdown .dropdown-item { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#musicDropdown .song-label { flex:1; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px; }
+
+/* Download button visual */
+#musicDropdown .download-btn{
+  display:inline-grid;
+  place-items:center;
+  min-width:44px;
+  height:36px;
+  padding:6px;
+  border-radius:10px;
+  text-decoration:none;
+  border:1px solid rgba(255,255,255,0.04);
+  background: linear-gradient(90deg,var(--grad2),var(--grad1));
+  color:var(--fg);
+  font-weight:700;
+  font-size:13px;
+  box-shadow: 0 10px 22px rgba(11,59,255,0.06);
+  transition: transform .12s ease, box-shadow .16s ease, opacity .12s ease;
+  cursor: pointer;
+}
+/* ====== NEW PREMIUM DOWNLOAD BUTTON STYLE ====== */
+#musicDropdown .download-btn{
+  display:inline-grid;
+  place-items:center;
+  min-width:44px;
+  height:36px;
+  padding:6px;
+  border-radius:12px;
+  text-decoration:none;
+  border:1.5px solid rgba(255,255,255,0.6);   /* white outline (60%) */
+  background: rgba(0,0,0,0.35);                /* dark + semi-transparent */
+  color:#ffffff;
+  font-weight:700;
+  font-size:13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  transition: 
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+#musicDropdown .download-btn:hover{
+  transform: scale(1.07);
+  background: rgba(0,0,0,0.55);
+  box-shadow: 0 10px 24px rgba(255,255,255,0.25);
+}
+
+#musicDropdown .download-btn:focus{
+  outline: 3px solid rgba(255,255,255,0.4);
+  outline-offset:2px;
+}
+/* ====== END PREMIUM STYLE ====== */
+
+
+/* svg sizing + accessible hidden text */
+#musicDropdown .download-btn svg{ width:18px; height:18px; display:block; }
+.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  </style>
+  <style>
+/* overscroll / touch physics */
+.messages {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* jangan biarkan body ikut scroll */
+  position: relative; /* buat pos scrollbar custom */
+}
+
+/* custom scrollbar container (overlay) */
+.custom-scrollbar {
+  position: absolute;
+  right: 6px; /* a little inset from panel edge */
+  top: 12px;
+  bottom: 84px; /* leave room for composer + floating btn */
+  width: 10px;
+  border-radius: 999px;
+  pointer-events: none; /* default off; thumb will enable pointer-events when visible */
+  opacity: 0;
+  transition: opacity .28s ease;
+  z-index: 50;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+}
+.custom-scrollbar.show { opacity: 1; pointer-events: auto; }
+
+/* track area (clickable) */
+.custom-scrollbar .track {
+  width: 10px;
+  height: 100%;
+  border-radius: 999px;
+  background: transparent;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  cursor: pointer;
+}
+
+/* thumb */
+.custom-scrollbar .thumb {
+  width: 10px;
+  min-height: 36px;
+  border-radius: 999px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.35);
+  background: linear-gradient(180deg, var(--grad2), var(--grad1));
+  transform-origin: top center;
+  touch-action: none;
+  user-select: none;
+}
+
+/* small visible affordance when hovering panel */
+.panel:hover .custom-scrollbar { opacity: 1; }
+
+/* hide native scrollbar to avoid double visuals on webkit (but keep accessible) */
+.messages.hide-native-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+  <audio id="bgMusic" src="bg-music.mp3" loop></audio>
+  <!-- STARTUP SFX (ditambahkan) -->
+  <audio id="startupAudio" src="startup.wav"></audio>
+
+  <div class="sky" aria-hidden="true">
+    <canvas class="stars" id="stars"></canvas>
+  </div>
+
+  <!-- Splash + Loading -->
+  <section id="splash" aria-label="Memulai DustineGPT">
+    <div class="splash-inner">
+      <div class="logo" aria-hidden="true">
+        <svg class="mark" viewBox="0 0 100 100" width="96" height="96" aria-hidden="true">
+          <path d="M25 20 L25 80 Q60 80 60 50 Q60 20 25 20"/>
+          <path d="M75 30 Q50 15 35 30 Q20 45 35 65 Q50 85 75 70 L75 55 L60 55"/>
+        </svg>
+      </div>
+      <div class="loader" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar" id="bar"></div>
+      </div>
+      <div class="loading-label" id="loadingLabel">Memuat…</div>
+      <!-- TIP: element untuk menampilkan tips acak saat loading -->
+      <div class="loading-tip" id="loadingTip" aria-live="polite">Tip: Tunggu sebentar…</div>
+
+      <!-- START BUTTON (ditambahkan) -->
+      <button id="startBtn" class="start-btn hidden" aria-label="Mulai DustineGPT" aria-pressed="false">Mulai</button>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <div id="app" class="container" aria-live="polite">
+    <header>
+      <div class="brand">
+        <div class="mini" aria-hidden="true">
+          <svg viewBox="0 0 100 100" width="20" height="20">
+            <path d="M25 20 L25 80 Q60 80 60 50 Q60 20 25 20" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+            <path d="M75 30 Q50 15 35 30 Q20 45 35 65 Q50 85 75 70 L75 55 L60 55" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="name">DustineGPT</div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="musicBtn" title="Putar/Hentikan Musik"><span class="btn-label">🎵 Musik</span> <span class="rip"></span></button>
+        <!-- Dropdown Lagu -->
+<div id="musicDropdown" class="dropdown hidden" aria-hidden="true">
+  <div class="dropdown-item" data-file="bg-music.mp3" data-name="Sekarang memainkan: In Dreamland">In Dreamland</div>
+  <div class="dropdown-item" data-file="bg-music1.mp3" data-name="Sekarang memainkan: And So It Begins">And So It Begins ♕</div>
+</div>
+
+        <!-- NEW: Settings button (same style & sound) -->
+        <button class="btn" id="settingsBtn" title="Pengaturan"><span class="btn-label">⚙️ Pengaturan</span> <span class="rip"></span></button>
+
+        <button class="btn" id="clearBtn" title="Hapus percakapan">🧹 Bersihkan <span class="rip"></span></button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" aria-label="Ruang Chat">
+        <div class="messages" id="messages" role="log" aria-live="polite"></div>
+
+        <!-- SCROLL TO BOTTOM BUTTON -->
+        <button id="scrollToBottom" class="scroll-to-bottom" aria-hidden="true" title="Gulir ke bawah">⬇</button>
+
+        <div class="composer">
+          <input id="input" class="input" placeholder="Masukkan teks..." />
+          <button id="send" class="btn" title="Kirim">➤ Kirim <span class="rip"></span></button>
+        </div>
+      </section>
+    </main>
+
+    <footer style="text-align:center; padding:8px; color:var(--muted); font-size:12px">
+      © <span id="y"></span> DustineGPT — AI terbaik sepanjang masa. (semoga)
+    </footer>
+  </div>
+
+  <!-- zGPT button -->
+  <button id="zgptBtn" class="zgpt-badge" aria-haspopup="true" aria-expanded="false" title="Tentang zGPT">
+    <span class="zgpt-text">zGPT 1.3.5</span>
+  </button>
+
+  <!-- toast message -->
+  <div id="zgptToast" class="zgpt-toast" role="status" aria-hidden="true" aria-live="polite">
+    <button class="close" id="zgptClose" aria-label="Tutup">✕</button>
+    <div class="title">Update zGPT 1.3.5</div>
+    <div class="msg">Update zGPT 1.3.5 FITUR SCROLL DITAMBAHKAN!! YEY!! Dan.. eum.. lupa, oh iya, update liquid glassnya lebih bagus dan.. AInya lebih pintar.</div>
+  </div>
+
+  <!-- MUSIC ACHIEVEMENT (left-bottom) -->
+  <div id="musicToast" class="music-toast" role="status" aria-hidden="true">
+  <div class="icon">♪</div>
+  <div class="body">
+    <div class="sub" id="musicToastSub">Sedang memainkan: </div>
+  </div>
+  <button class="close-btn" id="musicToastClose" aria-label="Tutup">✕</button>
+</div>
+
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsBackdrop" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal" role="document">
+  <!-- === API KEY === -->
+  <h3 id="settingsTitle">Pengaturan API OpenAI</h3>
+  <div class="hint">Masukkan API key OpenAI kamu di bawah. Jangan beri tahu siapa-siapa kodemu karena kode API sangat sensitif. Kodemu akan disimpan di browser ini dengan aman.</div>
+
+  <div class="field" style="margin-top:12px;">
+    <input id="apiKeyInput" type="password" placeholder="sk-xxxxxx..." aria-label="API OpenAI" />
+    <button id="toggleShow" class="btn btn-sm" title="Tampilkan/Sembunyikan">👁️</button>
+  </div>
+
+  <div class="field" style="margin-top:10px;">
+    <button id="saveApiBtn" class="btn btn-sm">💾 Simpan</button>
+    <button id="copyApiBtn" class="btn btn-sm">📋 Salin</button>
+    <button id="clearApiBtn" class="btn btn-sm">🗑️ Hapus</button>
+    <button id="closeSettingsBtn" class="btn btn-sm btn-close">✕ Tutup</button>
+  </div>
+
+  <div class="micro-msg" id="settingsMsg" aria-live="polite"></div>
+
+  <div style="margin-top:12px; font-size:12px; color:var(--muted)">
+    Catatan: Kunci API tersimpan hanya di browser ini. Jangan bagikan key kamu.
+  </div>
+
+  <!-- === PENGATURAN BALASAN (dibawah API) === -->
+  <hr style="margin-top:20px; border:0; height:1px; background:rgba(255,255,255,.03);">
+  <h3 style="margin-top:12px">Pengaturan Balasan</h3>
+  <div class="hint">Atur kecepatan mengetik AI dan jeda sebelum AI mulai membalas. Pilihanmu akan otomatis tersimpan di browser ini.</div>
+
+  <div style="margin-top:10px;">
+    <label class="small">Preset cepat:</label>
+    <div class="field" style="margin-top:8px;">
+      <select id="speedPreset" class="input" style="max-width:220px;">
+        <option value="slow">Lambat (natural)</option>
+        <option value="normal">Normal</option>
+        <option value="fast">Cepat</option>
+        <option value="flash">Kilat</option>
+      </select>
+      <button id="resetSpeedBtn" class="btn btn-sm" style="margin-left:auto">🔁 Reset</button>
+    </div>
+
+    <div class="field" style="margin-top:14px; flex-direction:column; gap:4px;">
+      <div class="small">Kecepatan Mengetik: <span id="typingSpeedVal">24</span></div>
+      <input id="typingSpeedRange" type="range" min="3" max="80" step="1" class="fancy-slider">
+    </div>
+
+    <div class="field" style="margin-top:10px; flex-direction:column; gap:4px;">
+      <div class="small">Delay Sebelum Menjawab: <span id="responseDelayVal">450</span></div>
+      <input id="responseDelayRange" type="range" min="0" max="3000" step="50" class="fancy-slider">
+    </div>
+
+    <div class="small" style="margin-top:8px; color:var(--muted)">
+      Tip: Jika kamu tidak mengerti tentang ms, jika angka lebih kecil maka kecepatan akan semakin cepat.
+    </div>
+  </div>
+</div>
+
+
+  <script>
+    /* ========= HELPERS ========= */
+    const $ = (q,root=document)=>root.querySelector(q);
+    const $$ = (q,root=document)=>[...root.querySelectorAll(q)];
+
+   // WebAudio tiny SFX
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    function blip(f=220, t=0.08){
+      try{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='triangle'; o.frequency.setValueAtTime(f,ctx.currentTime);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+t);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+t+0.02);
+      }catch(e){/* ignore audio errors */ }
+    }
+    function clickSfx(){ blip(320, .06); setTimeout(()=>blip(180,.07), 40) }
+    function sendSfx(){ blip(520,.06); setTimeout(()=>blip(260,.12), 35) }
+    function successSfx(){ blip(760,.06); setTimeout(()=>blip(420,.09), 50) }
+
+    // Ripple helper for buttons (mouse event required for coordinates)
+    function ripple(btn, ev){
+      const rip = btn && btn.querySelector('.rip');
+      if(!rip) return;
+      const span = document.createElement('span');
+      const rect = btn.getBoundingClientRect();
+      const x = (ev && typeof ev.clientX==='number') ? (ev.clientX - rect.left) : (rect.width/2);
+      const y = (ev && typeof ev.clientY==='number') ? (ev.clientY - rect.top) : (rect.height/2);
+      span.style.left = x + 'px';
+      span.style.top  = y + 'px';
+      rip.appendChild(span);
+      setTimeout(()=>span.remove(), 620);
+    }
+
+    /* ========= STARRY BACKDROP ========= */
+    const starCanvas = $('#stars');
+    const sctx = starCanvas && starCanvas.getContext && starCanvas.getContext('2d');
+    let stars = [];
+    function resizeStars(){
+      if(!sctx) return;
+      starCanvas.width = window.innerWidth;
+      starCanvas.height = window.innerHeight;
+      const count = Math.min(350, Math.floor(window.innerWidth*window.innerHeight/6000));
+      stars = Array.from({length:count}, ()=>(({
+        x: Math.random()*starCanvas.width,
+        y: Math.random()*starCanvas.height,
+        r: Math.random()*1.2 + 0.2,
+        t: Math.random()*Math.PI*2,
+        s: Math.random()*0.8+0.2
+      })));
+    }
+    function drawStars(){
+      if(!sctx) return;
+      sctx.clearRect(0,0,starCanvas.width, starCanvas.height);
+      for(const st of stars){
+        st.t += 0.02*st.s; // twinkle
+        const alpha = 0.4 + Math.sin(st.t)*0.35;
+        sctx.beginPath();
+        sctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+        sctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        sctx.fill();
+      }
+      requestAnimationFrame(drawStars);
+    }
+    window.addEventListener('resize', resizeStars);
+    resizeStars(); drawStars();
+
+    /* ========= SPLASH + LOADING ========= */
+    const splash = $('#splash');
+    const bar = $('#bar');
+    const label = $('#loadingLabel');
+    const tipEl = $('#loadingTip');
+    const app = $('#app');
+    const loadingStartTime = performance.now();
+
+    function easeOutCubic(x){return 1 - Math.pow(1 - x, 3)}
+
+    let p = 0;
+
+    // Durasi loading
+    const LOADING_DURATION_MS = 13000; // 13 detik
+
+    // tips untuk loading (acak)
+    const loadingTips = [
+      "Tip: Gunakan Shift+Enter untuk membuat baris baru saat mengetik.",
+      "Tip: Kalau API mu terus-terusan error, pake proxy/VPN aja.",
+      "Tip: Atur 'Kecepatan Mengetik' di Pengaturan untuk gaya percakapan.",
+      "Tip: Kamu bisa membersihkan chat kapan saja dengan tombol 🧹.",
+      "Tip: Untuk hasil kode, sertakan bahasa dan contoh input/output.",
+      "Tip: Cocok jika dibuka di komputer.",
+      "Tip: Jika ada error OpenAI, cek kuota dan validitas API key-mu.",
+      "Tip: Gunakan preset 'flash' untuk respons super cepat..",
+      "Tip: Tombol 🎵 mengendalikan musik latar — mute jika perlu fokus.",
+      "Tip: Jangan bagikan kode API mu ke siapapun.",
+      "Tip: Berikan konteks bila mau jawaban lebih akurat.",
+      "Tip: Untuk debugging, sertakan pesan error & kode yang relevan.",
+      "Tip: Mau balasan ringkas atau panjang? Katakan sebelum bertanya.",
+      "Tip: Jika loading lama, yaudah emang sengaja ku baking a little dramatic...",
+      "Tip: Fitur rate limiter mencegah pemanggilan berlebih ke OpenAI.",
+      "Tip: Untuk percakapan privat, jangan gunakan API key publik.",
+      "Tip: Gunakan tombol ⚙️ untuk menyesuaikan pengalaman chatmu.",
+      "Tip: Baca notifikasi kecil di pojok jika ada pembaruan fitur.",
+    ];
+
+    let tipIntervalId = null;
+    function startLoadingTips(){
+      if(!tipEl) return;
+      const initial = loadingTips[Math.floor(Math.random()*loadingTips.length)];
+      tipEl.textContent = initial;
+      tipEl.classList.add('visible');
+
+      tipIntervalId = setInterval(()=>{
+        tipEl.classList.remove('visible');
+        setTimeout(()=>{
+          const t = loadingTips[Math.floor(Math.random()*loadingTips.length)];
+          tipEl.textContent = t;
+          tipEl.classList.add('visible');
+        }, 520);
+      }, 5000);
+    }
+    function stopLoadingTips(){
+      if(tipIntervalId){
+        clearInterval(tipIntervalId);
+        tipIntervalId = null;
+      }
+      if(tipEl){
+        tipEl.classList.remove('visible');
+        tipEl.textContent = '';
+      }
+    }
+
+    function animateBar(now){
+      const elapsed = now - loadingStartTime;
+      const total = LOADING_DURATION_MS;
+      const ratio = Math.min(1, elapsed / total);
+      p = easeOutCubic(ratio);
+      const val = Math.floor(p*100);
+      if(bar) bar.style.width = (val + (val>96? (100-val)*.2:0)) + '%';
+      if(label) label.textContent = val<100? `Memuat… ${val}%` : 'Siap!';
+      const loaderEl = document.querySelector('.loader');
+      if(loaderEl) loaderEl.setAttribute('aria-valuenow', val);
+      if(ratio < 1) requestAnimationFrame(animateBar); else setTimeout(showApp, 300);
+    }
+
+    // mulai animasi + tips
+    requestAnimationFrame(animateBar);
+    startLoadingTips();
+
+    function showApp(){
+      stopLoadingTips();
+      const startBtn = $('#startBtn');
+      if(startBtn){
+        startBtn.classList.remove('hidden');
+        try{ startBtn.focus(); }catch(e){}
+        return;
+      }
+      // fallback jika tombol tidak ada
+      if(splash) splash.classList.add('hidden');
+      if(app) app.classList.add('ready');
+      setTimeout(()=> addBubble('Halo! Aku DustineGPT — AI paling ganteng di dunia ✨', 'bot'))
+      setTimeout(()=> addBubble('Eh kalau kotaknya udah penuh teken bersihkan pesan aja ya. Nanti deh kutambahinfitur scroll. ✨', 'bot'), 200);
+    }
+
+    /* ========= CHAT LOGIC ========= */
+    const messages = $('#messages');
+    const input = $('#input');
+    const sendBtn = $('#send');
+    const clearBtn = $('#clearBtn');
+    const scrollBtn = $('#scrollToBottom'); // NEW
+    $('#y').textContent = new Date().getFullYear();
+
+    // Helper: detect whether user is near the bottom of the message list
+    const SCROLL_THRESHOLD = 140; // px
+    function isNearBottom(){
+      if(!messages) return true;
+      return (messages.scrollHeight - messages.scrollTop - messages.clientHeight) < SCROLL_THRESHOLD;
+    }
+    function showScrollBtn(){
+      if(!scrollBtn) return;
+      scrollBtn.classList.add('show');
+      scrollBtn.setAttribute('aria-hidden','false');
+    }
+    function hideScrollBtn(){
+      if(!scrollBtn) return;
+      scrollBtn.classList.remove('show');
+      scrollBtn.setAttribute('aria-hidden','true');
+    }
+    function scrollToBottom(){
+      if(!messages) return;
+      messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' });
+      hideScrollBtn();
+    }
+    if(scrollBtn) scrollBtn.addEventListener('click', scrollToBottom);
+    if(messages) messages.addEventListener('scroll', ()=>{ if(isNearBottom()) hideScrollBtn(); else showScrollBtn(); });
+
+    function addBubble(text, who = 'bot'){
+      const wasNear = isNearBottom();
+      const wrap = document.createElement('div');
+      wrap.className = 'row';
+      const div = document.createElement('div');
+      div.className = `bubble ${who}`;
+
+      if(!text && text !== '') {
+        div.innerHTML = '';
+      } else {
+        div.innerHTML = sanitize(String(text));
+      }
+
+      wrap.appendChild(div);
+      if (messages) messages.appendChild(wrap);
+
+      // keep DOM from growing indefinitely (simple cap)
+      try{
+        if(messages && messages.children.length > 2000){ messages.removeChild(messages.firstChild); }
+      }catch(e){/* ignore */ }
+
+      // If user was near bottom, auto-scroll. If user scrolled up, show scroll button instead.
+      if (wasNear || who === 'user') {
+        if (messages) messages.scrollTop = messages.scrollHeight;
+        hideScrollBtn();
+      } else {
+        showScrollBtn();
+      }
+
+      return div;
+    }
+
+
+    function sanitize(s){
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    /* ======= GANTI mulai: Enhanced local AI (mock tanpa API) ======= */
+
+/* small local knowledge base (editable) */
+const LOCAL_KB = [
+  {q:"apa itu javascript", a:"JavaScript adalah bahasa scripting yang biasanya dipakai di web untuk membuat halaman interaktif. Bisa dipakai di frontend (browser) dan backend (Node.js)."},
+  {q:"apa itu html", a:"HTML (HyperText Markup Language) adalah bahasa markup untuk membuat struktur halaman web."},
+  {q:"apa itu css", a:"CSS (Cascading Style Sheets) mengatur tampilan visual halaman HTML: warna, layout, font, dll."},
+  {q:"siapa itu linus torvalds", a:"Linus Torvalds adalah pencipta kernel Linux dan pengelola utama proyek kernel Linux."},
+  {q:"minecraft", a:"Minecraft adalah game sandbox populer yang fokus ke crafting, building, dan eksplorasi — mau tips redstone, command, atau build?"}
+];
+
+/* fuzzy/simple match against local KB */
+function findLocalKB(query){
+  const q = query.trim().toLowerCase();
+  let best = null;
+  let bestScore = 0;
+  const toks = q.split(/\s+/).filter(Boolean);
+  for(const item of LOCAL_KB){
+    const itoks = item.q.split(/\s+/);
+    const common = toks.filter(t=> itoks.includes(t)).length;
+    if(common > bestScore){
+      bestScore = common;
+      best = item;
+    }
+  }
+  // ======= DustineGPT: Smart Patch (paste setelah LOCAL_KB) =======
+
+// ---------- persistence helper ----------
+function loadLocalKB(){
+  try{
+    const raw = localStorage.getItem('DUSTINE_LOCAL_KB');
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.warn('loadLocalKB err', e); }
+  return (typeof LOCAL_KB !== 'undefined' ? LOCAL_KB.slice() : []);
+}
+function saveLocalKB(kb){
+  try{ localStorage.setItem('DUSTINE_LOCAL_KB', JSON.stringify(kb)); }catch(e){ console.warn('saveLocalKB err', e); }
+}
+let DKB = loadLocalKB(); // in-memory working KB
+
+// ---------- /teach command ----------
+function teachCommandHandle(text){
+  // Format: /teach pertanyaan || jawaban
+  if(!text || !text.trim().startsWith('/teach')) return false;
+  const body = text.replace('/teach','').trim();
+  const parts = body.split('||').map(s=>s.trim()).filter(Boolean);
+  if(parts.length < 2){
+    // fallback message helper: try to use addBubble if exists
+    if(typeof addBubble === 'function') addBubble('Gunakan: /teach pertanyaan || jawaban', 'bot');
+    else console.log('Gunakan: /teach pertanyaan || jawaban');
+    return true;
+  }
+  const q = parts[0].toLowerCase();
+  const a = parts.slice(1).join(' || ');
+  DKB.unshift({q, a});
+  saveLocalKB(DKB);
+  if(typeof addBubble === 'function') addBubble('Siap! Aku sudah belajar itu ✅', 'bot');
+  else console.log('Siap! Aku sudah belajar itu ✅');
+  return true;
+}
+
+// ---------- improved findLocalKB (scoring) ----------
+function findLocalKB(query){
+  const q = (query||'').trim().toLowerCase();
+  if(!q) return null;
+  const toks = q.split(/\s+/).filter(Boolean);
+  let best = null;
+  let bestScore = -1;
+  const kb = DKB || (typeof LOCAL_KB !== 'undefined' ? LOCAL_KB : []);
+  for(const item of kb){
+    const text = (item.q||'').toLowerCase();
+    if(!text) continue;
+    // exact match super-high
+    if(text === q){
+      return item.a;
+    }
+    let score = 0;
+    const itoks = text.split(/\s+/).filter(Boolean);
+    // token overlap
+    const common = toks.filter(t => itoks.includes(t)).length;
+    score += common * 12;
+    // substring boost
+    if(text.includes(q) || q.includes(text)) score += 10;
+    // partial token matches
+    for(const t of toks){
+      for(const it of itoks){
+        if(it.startsWith(t) || it.endsWith(t) || it.includes(t)) score += 3;
+      }
+    }
+    // prefer shorter KB questions (precision)
+    score += Math.max(0, 6 - itoks.length);
+    // penalize too short query (avoid false positives)
+    score -= Math.max(0, 2 - toks.length);
+    if(score > bestScore){ bestScore = score; best = item; }
+  }
+  // threshold: only return if reasonably confident
+  if(bestScore >= 6) return best.a;
+  return null;
+}
+
+// ---------- RAG wrapper for OpenAI calls (uses local KB first) ----------
+async function callOpenAI_withRAG(userPrompt, opts = {}){
+  // opts may include model, temperature, etc.
+  const kbAnswer = findLocalKB(userPrompt);
+  let prompt = userPrompt;
+  if(kbAnswer){
+    // prepend concise context so model uses local knowledge first
+    prompt = `Local knowledge (from your KB):\n${kbAnswer}\n\nUser asks: ${userPrompt}`;
+  }
+  // If callOpenAIWithRetries exists, use it; else fallback to existing call
+  if(typeof callOpenAIWithRetries === 'function'){
+    return await callOpenAIWithRetries(prompt, opts);
+  } else if(typeof callOpenAI === 'function'){
+    return await callOpenAI(prompt, opts);
+  } else {
+    // fallback to enhancedMockAI if no API
+    if(typeof enhancedMockAI === 'function') return await enhancedMockAI(prompt);
+    return "Maaf, fungsi pemanggil AI gak tersedia.";
+  }
+}
+
+// ---------- Wiki caching ----------
+async function fetchWikiSummaryCached(q){
+  if(!q) return null;
+  const key = 'WIKI_CACHE_' + q.toLowerCase();
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // cache 7 hari
+      if(Date.now() - parsed.t < 1000*60*60*24*7) return parsed.v;
+    }
+  }catch(e){}
+  // assume fetchWikiSummary exists
+  let v = null;
+  try{
+    if(typeof fetchWikiSummary === 'function') v = await fetchWikiSummary(q);
+    else v = null;
+  }catch(e){ v = null; }
+  try{ localStorage.setItem(key, JSON.stringify({t: Date.now(), v})); }catch(e){}
+  return v;
+}
+
+// ---------- small UI: Manage KB in Settings (tries to find a settings container) ----------
+function injectKBEditorToSettings(){
+  try{
+    const settingsEl = document.querySelector('#settingsModal, .settings, #settings'); // guess common ids
+    if(!settingsEl) return;
+    if(document.querySelector('#kbEditorBlock')) return; // already injected
+    const wrap = document.createElement('div');
+    wrap.id = 'kbEditorBlock';
+    wrap.style.marginTop = '12px';
+    wrap.innerHTML = `
+      <hr/>
+      <h4 style="margin:6px 0;">Local KB (teach)</h4>
+      <textarea id="kbEditor" style="width:100%;height:120px;font-size:13px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button id="kbLoadBtn" class="btn">Muat</button>
+        <button id="kbSaveBtn" class="btn">Simpan</button>
+        <button id="kbExportBtn" class="btn">Export JSON</button>
+        <button id="kbClearBtn" class="btn">Hapus semua</button>
+      </div>
+      <small style="opacity:0.8">Gunakan /teach pertanyaan || jawaban juga dari chat.</small>
+    `;
+    settingsEl.appendChild(wrap);
+
+    document.getElementById('kbLoadBtn').onclick = ()=>{ document.getElementById('kbEditor').value = JSON.stringify(DKB || LOCAL_KB, null, 2); };
+    document.getElementById('kbSaveBtn').onclick = ()=> {
+      try{
+        const parsed = JSON.parse(document.getElementById('kbEditor').value);
+        DKB = parsed;
+        saveLocalKB(DKB);
+        alert('KB disimpan ✅');
+      }catch(e){ alert('JSON invalid'); }
+    };
+    document.getElementById('kbExportBtn').onclick = ()=> {
+      const blob = new Blob([JSON.stringify(DKB || LOCAL_KB, null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'dustine_kb.json';
+      a.click();
+    };
+    document.getElementById('kbClearBtn').onclick = ()=> {
+      if(confirm('Hapus semua local KB?')){ DKB = []; saveLocalKB(DKB); alert('Dihapus ✅'); }
+    };
+  }catch(e){ console.warn('injectKBEditorToSettings err', e); }
+}
+// try inject on load & a bit later in case settings loads later
+setTimeout(injectKBEditorToSettings, 1200);
+setTimeout(injectKBEditorToSettings, 3500);
+
+// ---------- export helpers (optional) ----------
+window.DustineKB = {
+  get: ()=>DKB,
+  save: (kb)=>{ DKB = kb; saveLocalKB(DKB); },
+  teach: (q,a)=>{ DKB.unshift({q:q.toLowerCase(), a}); saveLocalKB(DKB); }
+};
+
+// ======= End of patch =======
+
+  // require at least one common token
+  return bestScore ? best.a : null;
+}
+
+/* safe arithmetic evaluator for expressions like: 2+2*(3-1) */
+function isLikelyMath(s){
+  return /^[0-9\s\+\-\*\/\%\^\.\(\)]+$/.test(s.trim());
+}
+function safeEvalMath(expr){
+  // allow digits, spaces, + - * / % ^ . ( )
+  if(!isLikelyMath(expr)) throw new Error('Not math');
+  // convert ^ to ** for exponent
+  const clean = expr.replace(/\^/g,'**').replace(/[^0-9\+\-\*\/\%\.\(\)\s\*]/g,'');
+  // double-check no consecutive suspicious tokens
+  try{
+    // eslint-disable-next-line no-new-func
+    const res = Function(`return (${clean})`)();
+    if(typeof res === 'number' && isFinite(res)) return `Hasil: ${res}`;
+    return 'Ekspresi tidak menghasilkan angka valid.';
+  }catch(e){
+    throw new Error('Gagal menghitung ekspresi.');
+  }
+}
+
+/* fetch Wikipedia summary (tries Indonesian first, then English) */
+async function fetchWikiSummary(q){
+  const enc = encodeURIComponent(q);
+  const endpoints = [
+    // id wiki summary (REST) - CORS friendly with origin
+    `https://id.wikipedia.org/api/rest_v1/page/summary/${enc}`,
+    `https://en.wikipedia.org/api/rest_v1/page/summary/${enc}`
+  ];
+  for(const url of endpoints){
+    try{
+      const res = await fetch(url, {headers:{'Accept':'application/json'}});
+      if(!res.ok) continue;
+      const j = await res.json();
+      if(j && (j.extract || j.displaytitle)){
+        let out = '';
+        if(j.displaytitle) out += `${j.displaytitle} — `;
+        out += (j.extract ? j.extract : 'Ringkasan tidak tersedia.');
+        if(j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page){
+          out += `\n\nSumber: ${j.content_urls.desktop.page}`;
+        }
+        return out;
+      }
+    }catch(e){
+      // ignore and try next
+    }
+  }
+  // fallback null
+  return null;
+}
+    /* improved smartAnswer fallback (kept lightweight) */
+function smartAnswerEnhanced(q){
+  const p = q.trim().toLowerCase();
+  if(p.endsWith('?')) return 'Kayaknya jawabannya butuh konteks — kasih sedikit detail biar lebih tepat.';
+  if(p.length < 12) return 'Singkat banget, ceritain lebih lengkap dong.';
+  if(/regex|regular expression/.test(p)) return 'Untuk regex: coba bikin test case kecil & gunakan regex101 untuk debug. Sebutkan input contoh ya.';
+  if(/performance|cepat|optim/.test(p)) return 'Optimisasi: profil dulu, identifikasi bottleneck, gunakan caching, dan ukur setelah tiap optimisasi.';
+  return 'Oke, kita pecah masalahnya jadi beberapa langkah. Sebutkan bahasa/targetnya biar aku bantu tahap demi tahap.';
+}
+
+/* main enhanced mock (async) */
+async function enhancedMockAI(prompt){
+  const raw = String(prompt || '');
+  const p = raw.trim();
+  if(p === '') return "Ketik sesuatu dulu ya 🙂";
+
+  // quick greetings / short rules (sync)
+  if(/^(halo|hai|hei|hi|selamat)/i.test(p)) return "Halo! Tanyain apa aja, aku jawab sebaik mungkin.";
+  if(/^(siapa kamu|kamu siapa)/i.test(p)) return "Namaku DustineGPT versi offline — aku bantu semaksimal aturan yang ada di browser ini :)";
+  if(/\bmukkit|minecraft|mc\b/i.test(p)) {
+    const kb = findLocalKB('minecraft');
+    if(kb) return kb;
+  }
+
+  // local KB
+  const kbMatch = findLocalKB(p);
+  if(kbMatch) return kbMatch;
+
+  // math
+  try{
+    if(isLikelyMath(p)) return safeEvalMath(p);
+  }catch(e){
+    // fallthrough
+  }
+
+  // definition / who is / apa itu / siapa
+  if(/^(apa itu|apa itu |siapa (adalah|itu)|siapa itu|who is|what is|define |definis)/i.test(p) || /^(apa itu|siapa|what|who)\b/i.test(p)){
+    // try wikipedia
+    try{
+      const q = p.replace(/^(apa itu|apa|siapa|who is|what is|define)\s*/i,'').trim() || p;
+      const wiki = await fetchWikiSummary(q);
+      if(wiki) return wiki;
+    }catch(e){
+      // ignore fetch errors
+    }
+  }
+
+  // code request patterns
+  if(/\b(?:contoh|buat|implement|cara (membuat|membuat)|how to|implement)\b/i.test(p) && /kode|program|function|script|javascript|python|java|c\+\+|c#/i.test(p)){
+    // small template helper
+    if(/python/i.test(p)) return "Contoh (Python):\n```python\n# Contoh fungsi sederhana\ndef halo(nama):\n    return f'Hallo, {nama}!'\n\nprint(halo('Dustine'))\n```";
+    if(/javascript|js/i.test(p)) return "Contoh (JavaScript):\n```js\nfunction halo(nama){\n  return `Halo, ${nama}!`;\n}\nconsole.log(halo('Dustine'));\n```";
+    return "Sebutkan bahasa yang diinginkan (mis. Python, JavaScript) dan jelaskan input/output yang diharapkan.";
+  }
+
+  // try Wikipedia quick search for general non-trivial queries (best-effort)
+  try{
+    const wiki = await fetchWikiSummary(p);
+    if(wiki) return wiki;
+  }catch(e){ /* ignore */ }
+
+  // final fallback
+  return smartAnswerEnhanced(p);
+}
+
+
+    /* ========= TYPING / REPLY SPEED CONFIG ========= */
+    // keys
+    const KEY_TYPING_SPEED = 'reply_typing_speed'; // ms per char
+    const KEY_RESPONSE_DELAY = 'reply_response_delay'; // ms before starting
+    const DEFAULTS = { typingSpeed: 24, responseDelay: 450 };
+
+    function getReplySettings(){
+      const ts = parseInt(localStorage.getItem(KEY_TYPING_SPEED));
+      const rd = parseInt(localStorage.getItem(KEY_RESPONSE_DELAY));
+      return {
+        typingSpeed: Number.isFinite(ts) && !isNaN(ts) ? ts : DEFAULTS.typingSpeed,
+        responseDelay: Number.isFinite(rd) && !isNaN(rd) ? rd : DEFAULTS.responseDelay
+      };
+    }
+
+    function setReplySettings({typingSpeed, responseDelay}){
+      if(typeof typingSpeed === 'number') localStorage.setItem(KEY_TYPING_SPEED, String(typingSpeed));
+      if(typeof responseDelay === 'number') localStorage.setItem(KEY_RESPONSE_DELAY, String(responseDelay));
+      updateSettingsUI();
+    }
+
+    function applyPreset(name){
+      let cfg = {...DEFAULTS};
+      if(name === 'slow') cfg = { typingSpeed: 48, responseDelay: 900 };
+      if(name === 'normal') cfg = { typingSpeed: 24, responseDelay: 450 };
+      if(name === 'fast') cfg = { typingSpeed: 10, responseDelay: 150 };
+      if(name === 'flash') cfg = { typingSpeed: 4, responseDelay: 40 };
+      setReplySettings(cfg);
+      $('#speedPreset').value = name;
+      showSettingsMsg('Preset diterapkan.');
+    }
+
+    function updateSettingsUI(){
+      const s = getReplySettings();
+      const tsRange = $('#typingSpeedRange');
+      const rdRange = $('#responseDelayRange');
+      const tsVal = $('#typingSpeedVal');
+      const rdVal = $('#responseDelayVal');
+      if(tsRange) tsRange.value = s.typingSpeed;
+      if(rdRange) rdRange.value = s.responseDelay;
+      if(tsVal) tsVal.textContent = s.typingSpeed + 'ms';
+      if(rdVal) rdVal.textContent = s.responseDelay + 'ms';
+    }
+
+    // Helper untuk mengetik karakter dengan efek pop
+    let _typingInterval = null;
+    function typeReply(text){
+      text = String(text || '');
+      const node = addBubble('', 'bot');
+      let i = 0;
+      const { typingSpeed } = getReplySettings();
+
+      if(_typingInterval){
+        clearInterval(_typingInterval);
+        _typingInterval = null;
+      }
+
+      _typingInterval = setInterval(()=>{
+        const ch = text.charAt(i);
+
+        if(ch === '\n'){
+          node.appendChild(document.createElement('br'));
+        } else {
+          const span = document.createElement('span');
+          span.className = 'char';
+          span.textContent = (ch === ' ' ? '\u00A0' : ch);
+          node.appendChild(span);
+        }
+
+        if(messages) messages.scrollTop = messages.scrollHeight;
+        i++;
+        if(i >= text.length){
+          clearInterval(_typingInterval);
+          _typingInterval = null;
+        }
+      }, Math.max(3, typingSpeed));
+    }
+
+    /* ========= OPENAI + RATE LIMITER (keep original) ========= */
+
+    const STORAGE_KEY = 'openai_api_key';
+
+    // CONFIG: tweak jika mau — default konservatif supaya 429 kecil kemungkinannya
+    const RATE_PER_MINUTE = 20; // default requests per minute (client-side). Bisa diubah.
+    const CONCURRENCY = 1;      // concurrent requests to OpenAI
+    const MAX_COOLDOWN_MS = 60_000; // max global cooldown on repeated 429s
+
+    class RequestLimiter {
+      constructor({ratePerMinute=RATE_PER_MINUTE, concurrency=CONCURRENCY, maxCooldown=MAX_COOLDOWN_MS} = {}){
+        this.ratePerMinute = ratePerMinute;
+        this.tokens = ratePerMinute; // start full
+        this.capacity = ratePerMinute;
+        this.concurrency = concurrency;
+        this.maxCooldown = maxCooldown;
+        this.queue = [];
+        this.running = 0;
+        this.cooldownUntil = 0;
+        this.lastRefill = Date.now();
+        this.refillInterval = 1000; // ms
+        this.tokenPerInterval = ratePerMinute / 60; // per second
+        this._refillTimer = setInterval(()=> this._refill(), this.refillInterval);
+      }
+      _refill(){
+        const now = Date.now();
+        const elapsedSec = Math.max(0, (now - this.lastRefill)/1000);
+        if(elapsedSec <= 0) return;
+        this.lastRefill = now;
+        this.tokens = Math.min(this.capacity, this.tokens + elapsedSec * this.tokenPerInterval);
+        this._tryProcess();
+      }
+      async request(fn){
+        return new Promise((resolve,reject)=>{
+          this.queue.push({fn, resolve, reject});
+          this._tryProcess();
+        });
+      }
+      _tryProcess(){
+        if(this.running >= this.concurrency) return;
+        if(this.queue.length === 0) return;
+        if(Date.now() < this.cooldownUntil) return; // global cooldown active
+        if(this.tokens < 1) return; // not enough rate budget yet
+        const item = this.queue.shift();
+        if(!item) return;
+        this.tokens -= 1;
+        this.running++;
+        (async ()=>{
+          try{
+            const res = await item.fn();
+            item.resolve(res);
+          }catch(err){
+            item.reject(err);
+          }finally{
+            this.running--;
+            setTimeout(()=> this._tryProcess(), 0);
+          }
+        })();
+      }
+      triggerCooldown(baseMs=1000){
+        const now = Date.now();
+        const prev = Math.max(0, this.cooldownUntil - now);
+        let next = Math.min(this.maxCooldown, Math.max(baseMs, prev * 2 || baseMs));
+        if(next < baseMs) next = baseMs;
+        this.cooldownUntil = now + next;
+        console.warn(`RequestLimiter: applied global cooldown ${next}ms (until ${new Date(this.cooldownUntil).toISOString()})`);
+      }
+      shutdown(){
+        clearInterval(this._refillTimer);
+      }
+    }
+
+    const limiter = new RequestLimiter({ratePerMinute: RATE_PER_MINUTE, concurrency: CONCURRENCY, maxCooldown: MAX_COOLDOWN_MS});
+
+    function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+    async function callOpenAI(prompt, {model='gpt-3.5-turbo', timeoutMs=60000} = {}){ const key = localStorage.getItem(STORAGE_KEY) || ''; if(!key) throw new Error('NO_API_KEY');
+
+      const payload = {
+        model,
+        messages: [{role:'user', content: prompt}],
+        temperature: 0.7,
+        max_tokens: 1024,
+        n: 1,
+      };
+
+      const controller = new AbortController();
+      const id = setTimeout(()=> controller.abort(), timeoutMs);
+
+      try{
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + key
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(id);
+
+        if(!res.ok){
+          let bodyText = '';
+          try{
+            const ct = res.headers.get('content-type') || '';
+            if(ct.includes('application/json')){
+              const j = await res.json();
+              bodyText = j?.error?.message || JSON.stringify(j);
+            }else{
+              bodyText = await res.text();
+            }
+          }catch(e){ bodyText = res.statusText || '' }
+
+          const msg = `HTTP ${res.status} ${res.statusText}${bodyText? ': '+bodyText : ''}`;
+          const e = new Error(msg);
+          e.status = res.status;
+          throw e;
+        }
+
+        const data = await res.json();
+        const out = (data.choices && data.choices[0] && (data.choices[0].message?.content || data.choices[0].text)) || data.output?.text || '';
+        return out;
+      }catch(err){
+        if(err.name === 'AbortError'){
+          const e = new Error('TIMEOUT'); e.status = 408; throw e;
+        }
+        throw err;
+      }
+    }
+
+    async function callOpenAIWithRetries(prompt, opts){
+      const maxRetries = 3;
+      let attempt = 0;
+      while(true){
+        try{
+          return await callOpenAI(prompt, opts);
+        }catch(err){
+          const status = err && (err.status || (typeof err.status === 'number' && err.status));
+          if(status === 429 && attempt < maxRetries){
+            const delay = 1000 * Math.pow(2, attempt);
+            console.warn(`OpenAI rate limit (429). Retrying in ${delay}ms — attempt ${attempt+1}/${maxRetries}`);
+            limiter.triggerCooldown(delay * 0.9);
+            await sleep(delay + Math.floor(Math.random()*200));
+            attempt++;
+            continue;
+          }
+          if(status === 429){
+            limiter.triggerCooldown(2000 * Math.pow(2, attempt));
+            const e = new Error('RATE_LIMIT_EXCEEDED'); e.status = 429; throw e;
+          }
+          throw err;
+        }
+      }
+    }
+
+    function showErrorBubble(msg){
+      const text = msg && String(msg).trim() ? msg : 'Terjadi kesalahan tak terduga.';
+      addBubble(`<strong>Terjadi kesalahan:</strong> ${sanitize(text)}`, 'bot');
+    }
+
+    async function send(){
+      const v = input && input.value;
+      if(!v || !v.trim()) { clickSfx(); return }
+      sendSfx();
+      addBubble(sanitize(v), 'user');
+      if(input) input.value='';
+      const thinking = addBubble('⏳ Mengetik…','bot');
+
+            const key = localStorage.getItem(STORAGE_KEY) || '';
+      if(!key){
+        const { responseDelay } = getReplySettings();
+        setTimeout(async ()=>{
+          thinking.remove();
+          try{
+            const reply = await enhancedMockAI(v);
+            typeReply(reply);
+          }catch(err){
+            console.error('enhancedMockAI error', err);
+            typeReply('Ups, aku nggak bisa jawab sekarang. Coba ulangi dengan pertanyaan yang lebih sederhana.');
+          }
+        }, Math.max(0, responseDelay + Math.floor(Math.random()*200)));
+        return;
+      }
+
+
+      try{
+        const replyText = await limiter.request(() => callOpenAIWithRetries(v, {model: 'gpt-3.5-turbo', timeoutMs: 60000}));
+        thinking.remove();
+        if(!replyText || !replyText.trim()){
+          showErrorBubble('OpenAI mengembalikan jawaban kosong.');
+          return;
+        }
+        const { responseDelay } = getReplySettings();
+        setTimeout(()=> typeReply(replyText), Math.max(0, responseDelay));
+      }catch(err){
+        thinking.remove();
+        const msg = err && err.message ? err.message : String(err || 'Unknown error');
+        if(err && err.message === 'NO_API_KEY'){
+          showErrorBubble('Tidak ada API key terdeteksi. Buka Pengaturan dan simpan API keymu.');
+        }else if(err && err.message === 'TIMEOUT'){
+          showErrorBubble('Permintaan ke OpenAI timeout (lebih dari 60s).');
+        }else if(err && (err.status === 401 || /invalid api key/i.test(msg))){
+          showErrorBubble('API key tidak valid (401). Pastikan key benar dan aktif.');
+        }else if(err && (err.status === 429 || err.message === 'RATE_LIMIT_EXCEEDED')){
+          showErrorBubble('Rate limit terlampaui (429). Sistem otomatis memperlambat permintaan. Mohon cek kuota/usage atau kurangi frekuensi panggilan.');
+        }else if(/Failed to fetch|NetworkError/i.test(msg)){
+          showErrorBubble('Gagal terhubung ke OpenAI — kemungkinan masalah jaringan atau CORS.');
+        }else{
+          showErrorBubble(msg || 'Terjadi kesalahan tak terduga.');
+        }
+        console.error('OpenAI error:', err);
+      }
+    }
+
+    sendBtn && sendBtn.addEventListener('click', (e)=>{ ripple(sendBtn,e); send(); });
+    clearBtn && clearBtn.addEventListener('click', (e)=>{ ripple(clearBtn,e); clickSfx(); if(messages) messages.innerHTML=''; addBubble('Percakapan dibersihkan. Mulai lagi ya. ✨','bot'); });
+    input && input.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send() }
+    });
+
+
+/* ========= MUSIC DROPDOWN & PLAYER (ENHANCED) ========= */
+const musicBtn = $('#musicBtn');
+const bgMusic = $('#bgMusic');
+const dropdown = $('#musicDropdown');
+const toast = $('#musicToast');
+const toastSub = $('#musicToast .sub');
+const toastClose = $('#musicToastClose');
+
+let musicPlaying = false;
+let toastTimer = null;
+let dropdownOpen = false;
+let closeTimeout = null;
+
+// Tampilkan toast (uses existing toast element)
+function showToast(text){
+  if(!toast || !toastSub) return;
+  toastSub.textContent = text;
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> toast.classList.remove('show'),3800);
+}
+
+if(toastClose){
+  toastClose.addEventListener('click',(e)=>{
+    ripple(toastClose,e);
+    toast.classList.remove('show');
+  });
+}
+
+// small ripple wrapper for non-button elements via original ripple()
+function safeRipple(el, e){ try{ ripple(el, e); }catch(e){} }
+
+// Position & open dropdown under the button with animation
+function openDropdown(){
+  if(!dropdown || !musicBtn) return;
+  dropdown.style.display = 'block';
+  dropdown.style.visibility = 'hidden';
+  dropdown.classList.remove('open');
+  dropdown.classList.remove('hidden');
+
+  const ddW = dropdown.offsetWidth || 240;
+  const rect = musicBtn.getBoundingClientRect();
+
+  let left = Math.round(rect.left + rect.width/2 - ddW/2);
+  left = Math.max(8, Math.min(left, window.innerWidth - ddW - 8));
+  const top = Math.round(rect.bottom + 10);
+
+  dropdown.style.left = left + 'px';
+  dropdown.style.top = top + 'px';
+
+  requestAnimationFrame(()=>{
+    dropdown.style.visibility = '';
+    dropdown.classList.add('open');
+    dropdown.setAttribute('aria-hidden','false');
+    musicBtn.setAttribute('aria-expanded','true');
+    dropdownOpen = true;
+    const first = dropdown.querySelector('.dropdown-item');
+    if(first) first.focus();
+  });
+
+  document.addEventListener('click', outsideClickHandler);
+  document.addEventListener('keydown', escapeHandler);
+  window.addEventListener('resize', repositionHandler);
+}
+
+function closeDropdown(){
+  if(!dropdown) return;
+  dropdown.classList.remove('open');
+  dropdown.setAttribute('aria-hidden','true');
+  musicBtn.setAttribute('aria-expanded','false');
+  dropdownOpen = false;
+  clearTimeout(closeTimeout);
+  closeTimeout = setTimeout(()=>{
+    dropdown.classList.add('hidden');
+    dropdown.style.display = '';
+    dropdown.style.left = '';
+    dropdown.style.top = '';
+  }, 260);
+
+  document.removeEventListener('click', outsideClickHandler);
+  document.removeEventListener('keydown', escapeHandler);
+  window.removeEventListener('resize', repositionHandler);
+}
+
+function outsideClickHandler(e){
+  if(!dropdownOpen) return;
+  const t = e.target;
+  if(!dropdown.contains(t) && !musicBtn.contains(t)){
+    closeDropdown();
+  }
+}
+
+function escapeHandler(e){
+  if(e.key === 'Escape') closeDropdown();
+}
+
+function repositionHandler(){
+  if(!dropdownOpen) return;
+  const rect = musicBtn.getBoundingClientRect();
+  const ddW = dropdown.offsetWidth || 240;
+  let left = Math.round(rect.left + rect.width/2 - ddW/2);
+  left = Math.max(8, Math.min(left, window.innerWidth - ddW - 8));
+  const top = Math.round(rect.bottom + 10);
+  dropdown.style.left = left + 'px';
+  dropdown.style.top = top + 'px';
+}
+
+// music button behavior: pause if playing, else toggle dropdown
+if(musicBtn){
+  musicBtn.addEventListener('click', (e)=>{
+    safeRipple(musicBtn, e);
+    clickSfx();
+    if(musicPlaying){
+      try{ bgMusic.pause(); }catch(e){}
+      musicPlaying = false;
+      musicBtn.innerHTML = '🎵 Musik <span class=\"rip\"></span>';
+      showToast('Musik dihentikan');
+      if(dropdownOpen) closeDropdown();
+      return;
+    }
+    if(dropdownOpen) closeDropdown(); else openDropdown();
+  });
+}
+
+// wire up items: click to play and close dropdown
+$$('.dropdown-item').forEach(item=>{
+  item.addEventListener('click', async (ev)=>{
+    const file = item.getAttribute('data-file');
+    const name = item.getAttribute('data-name') || item.textContent.trim();
+    try{
+      safeRipple(item, ev);
+      dropdown.classList.remove('open');
+      dropdown.setAttribute('aria-hidden','true');
+
+      bgMusic.src = file;
+      try{ bgMusic.volume = 0.45; }catch(e){}
+      await bgMusic.play();
+      musicPlaying = true;
+      musicBtn.innerHTML = '⏸ Hentikan <span class=\"rip\"></span>';
+      showToast(`${name}`);
+    }catch(err){
+      console.warn('play failed', err);
+      showToast('Gagal memutar lagu.');
+    } finally {
+      setTimeout(()=> closeDropdown(), 140);
+      bgMusic.onended = ()=>{
+        musicPlaying = false;
+        musicBtn.innerHTML = '🎵 Musik <span class=\"rip\"></span>';
+        showToast('Musik selesai');
+        bgMusic.onended = null;
+      };
+    }
+  });
+
+  item.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); } });
+});
+
+// pause handler updates button if paused by external means
+if(bgMusic){
+  bgMusic.addEventListener('pause', ()=> {
+    if(!bgMusic.currentTime || bgMusic.currentTime === 0) return;
+    musicPlaying = false;
+    try{ musicBtn.innerHTML = '🎵 Musik <span class=\"rip\"></span>'; }catch(e){}
+  });
+}
+
+/* ========= START BUTTON BEHAVIOR - IMPROVED & SAFE ========= */
+    const startBtnEl = $('#startBtn');
+    const startupAudioEl = $('#startupAudio');
+    const logoEl = $('.logo');
+
+    // helper: create a zoom-burst at click position that expands to cover screen then fades (safe, cleaned)
+    function createZoomBurst(x, y){
+      try{
+        const burst = document.createElement('div');
+        burst.className = 'zoom-burst';
+        document.body.appendChild(burst);
+        const size = 32; // base diameter
+        burst.style.width = size + 'px';
+        burst.style.height = size + 'px';
+        burst.style.left = x + 'px';
+        burst.style.top = y + 'px';
+        burst.style.opacity = '1';
+
+        // compute required scale to cover viewport
+        const cx = x; const cy = y;
+        const dx = Math.max(cx, window.innerWidth - cx);
+        const dy = Math.max(cy, window.innerHeight - cy);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const requiredDiameter = dist * 2;
+        const scale = Math.max(1, requiredDiameter / size) * 1.05;
+
+        requestAnimationFrame(()=>{
+          burst.style.transform = `translate(-50%,-50%) scale(${scale})`;
+          burst.style.transition = 'transform .78s cubic-bezier(.2,.9,.3,1), opacity .45s ease';
+        });
+
+        setTimeout(()=>{ burst.style.opacity = '0'; setTimeout(()=> burst.remove(), 480); }, 820);
+      }catch(e){ console.warn('zoom burst error', e); }
+    }
+
+    // keyboard accessible activation (Enter / Space)
+    function activateStartAnimation(ev){
+      if(ev && ev.type === 'keydown'){ if(ev.key !== 'Enter' && ev.key !== ' ') return; ev.preventDefault(); }
+      const rect = startBtnEl.getBoundingClientRect();
+      const clickX = rect.left + rect.width/2;
+      const clickY = rect.top + rect.height/2;
+
+      // prepare: small guard to prevent double-activation
+      if(startBtnEl.disabled) return;
+
+      // visual feedback
+      ripple(startBtnEl, null);
+      clickSfx();
+      startBtnEl.classList.add('pressed');
+      startBtnEl.setAttribute('aria-pressed','true');
+      startBtnEl.disabled = true;
+
+      // play sound (user gesture ensures this usually works)
+      try{ if(startupAudioEl){ startupAudioEl.currentTime = 0; startupAudioEl.play().catch(()=>{}); } }catch(err){}
+
+      // create burst and compute logo zoom to cover viewport smoothly (avoid scaling the whole container)
+      createZoomBurst(clickX, clickY);
+
+      if(logoEl){
+        try{
+          const logoRect = logoEl.getBoundingClientRect();
+          // compute center of viewport vs logo center
+          const vx = window.innerWidth/2; const vy = window.innerHeight/2;
+          // compute required scale so logo covers furthest corner
+          const dx = Math.max(vx, window.innerWidth - vx);
+          const dy = Math.max(vy, window.innerHeight - vy);
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const requiredDiameter = dist * 2;
+          const base = Math.max(logoRect.width, logoRect.height);
+          const scale = Math.max(1.6, requiredDiameter / base * 1.02);
+
+          // prepare transition
+          logoEl.style.transition = 'transform .78s cubic-bezier(.2,.9,.3,1), border-radius .4s ease';
+          logoEl.style.transformOrigin = 'center center';
+
+          // convert click into local translate so it feels like zooming from click
+          const offsetX = (clickX - (logoRect.left + logoRect.width/2));
+          const offsetY = (clickY - (logoRect.top + logoRect.height/2));
+          // use translate + scale
+          logoEl.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+          // remove rounded corners mid-zoom for clean fill
+          logoEl.style.borderRadius = '0';
+        }catch(e){ console.warn('logo zoom issue', e); }
+      }
+
+      // mark splash as zooming so other elements fade per CSS
+      if(splash) splash.classList.add('zooming');
+
+      // after zoom completes, hide splash and show app
+      setTimeout(()=>{
+        try{ if(splash) splash.classList.add('hidden'); }catch(e){}
+        try{ if(app) app.classList.add('ready'); }catch(e){}
+
+        // reset some visual state after we transitioned to app
+        setTimeout(()=>{
+          // safe cleanup
+          try{ startBtnEl.classList.remove('pressed'); startBtnEl.removeAttribute('aria-pressed'); }catch(e){}
+          try{ startBtnEl.disabled = true; }catch(e){}
+          addBubble('Halo! Aku DustineGPT — AI paling ganteng di dunia ✨','bot');
+        }, 240);
+      }, 920);
+
+      // final cleanup in case something left
+      setTimeout(()=>{
+        try{ if(logoEl){ logoEl.style.transition = ''; logoEl.style.transform = ''; logoEl.style.borderRadius = ''; } }catch(e){}
+      }, 1600);
+    }
+
+    if(startBtnEl){
+      // one-shot entrance ring when appears
+      const ringObserver = new MutationObserver((mut) => {
+        for(const m of mut){
+          if(m.attributeName === 'class'){
+            if(!startBtnEl.classList.contains('hidden')){
+              startBtnEl.classList.add('show-ring');
+              setTimeout(()=> startBtnEl.classList.remove('show-ring'), 900);
+              ringObserver.disconnect();
+            }
+          }
+        }
+      });
+      ringObserver.observe(startBtnEl, { attributes: true });
+
+      startBtnEl.addEventListener('click', (e)=>{ try{ activateStartAnimation(e); }catch(err){ console.warn('start click failed', err); } });
+      // keyboard activation
+      startBtnEl.addEventListener('keydown', activateStartAnimation);
+      // expose activation via Enter on whole document when splash is visible (accessibility)
+      document.addEventListener('keydown', (e)=>{
+        if(!splash || splash.classList.contains('hidden')) return;
+        if(e.key === 'Enter' || e.key === ' '){ if(document.activeElement === startBtnEl) return; /* let button handle it */ }
+      });
+    }
+
+    /* ========= SETTINGS (API KEY + reply speed) ========= */
+    const settingsBtn = $('#settingsBtn');
+    const settingsBackdrop = $('#settingsBackdrop');
+    const apiKeyInput = $('#apiKeyInput');
+    const toggleShow = $('#toggleShow');
+    const saveApiBtn = $('#saveApiBtn');
+    const clearApiBtn = $('#clearApiBtn');
+    const copyApiBtn = $('#copyApiBtn');
+    const closeSettingsBtn = $('#closeSettingsBtn');
+    const settingsMsg = $('#settingsMsg');
+
+    const speedPreset = $('#speedPreset');
+    const typingSpeedRange = $('#typingSpeedRange');
+    const responseDelayRange = $('#responseDelayRange');
+    const typingSpeedVal = $('#typingSpeedVal');
+    const responseDelayVal = $('#responseDelayVal');
+    const resetSpeedBtn = $('#resetSpeedBtn');
+
+    function openSettings(ev){
+      if(ev) ripple(settingsBtn, ev);
+      clickSfx();
+      populateApiInput();
+      updateSettingsUI();
+      settingsBackdrop.classList.add('show');
+      settingsBackdrop.setAttribute('aria-hidden','false');
+      setTimeout(()=> apiKeyInput.focus(), 120);
+    }
+
+    function closeSettings(){
+      settingsBackdrop.classList.remove('show');
+      settingsBackdrop.setAttribute('aria-hidden','true');
+      settingsMsg.textContent = '';
+    }
+
+    function populateApiInput(){
+      const val = localStorage.getItem(STORAGE_KEY) || '';
+      apiKeyInput.value = val;
+      apiKeyInput.type = 'password';
+    }
+
+    function showSettingsMsg(txt, short=true){
+      settingsMsg.textContent = txt;
+      if(short) setTimeout(()=>{ settingsMsg.textContent = ''; }, 3200);
+    }
+
+    settingsBtn && settingsBtn.addEventListener('click', openSettings);
+    closeSettingsBtn && closeSettingsBtn.addEventListener('click', (e)=>{ ripple(closeSettingsBtn,e); clickSfx(); closeSettings(); });
+    settingsBackdrop && settingsBackdrop.addEventListener('click', (e)=>{ if(e.target === settingsBackdrop) { clickSfx(); closeSettings(); } });
+    const modalEl = $('.modal'); if(modalEl) modalEl.addEventListener('click', (e)=> e.stopPropagation());
+
+    toggleShow && toggleShow.addEventListener('click', (e)=>{ ripple(toggleShow, e); clickSfx(); if(apiKeyInput.type === 'password') { apiKeyInput.type = 'text'; toggleShow.textContent = '🙈'; } else { apiKeyInput.type = 'password'; toggleShow.textContent = '👁️'; } apiKeyInput.focus(); });
+
+    saveApiBtn && saveApiBtn.addEventListener('click', (e)=>{
+      ripple(saveApiBtn, e); clickSfx();
+      const v = apiKeyInput.value.trim();
+      if(!v){
+        localStorage.removeItem(STORAGE_KEY);
+        showSettingsMsg('API key dihapus (kosong).');
+        return;
+      }
+      if(!/^sk-/.test(v)){
+        localStorage.setItem(STORAGE_KEY, v);
+        showSettingsMsg('Disimpan, tapi sebaiknya key dimulai dengan "sk-".');
+        successSfx();
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, v);
+      showSettingsMsg('API key tersimpan ✅');
+      successSfx();
+    });
+
+    clearApiBtn && clearApiBtn.addEventListener('click', (e)=>{ ripple(clearApiBtn, e); clickSfx(); localStorage.removeItem(STORAGE_KEY); apiKeyInput.value = ''; showSettingsMsg('API key dihapus.'); });
+
+    copyApiBtn && copyApiBtn.addEventListener('click', async (e)=>{ ripple(copyApiBtn, e); clickSfx(); const val = localStorage.getItem(STORAGE_KEY) || apiKeyInput.value || ''; if(!val){ showSettingsMsg('Belum ada API key untuk disalin.'); return; } try{ await navigator.clipboard.writeText(val); showSettingsMsg('API key disalin ke clipboard.'); successSfx(); }catch(err){ showSettingsMsg('Gagal menyalin: izinkan akses clipboard.'); } });
+
+    if(speedPreset) speedPreset.addEventListener('change', (e)=>{ applyPreset(e.target.value); });
+    if(typingSpeedRange) typingSpeedRange.addEventListener('input', (e)=>{ const v = parseInt(e.target.value); typingSpeedVal.textContent = v; localStorage.setItem(KEY_TYPING_SPEED, String(v)); });
+    if(responseDelayRange) responseDelayRange.addEventListener('input', (e)=>{ const v = parseInt(e.target.value); responseDelayVal.textContent = v; localStorage.setItem(KEY_RESPONSE_DELAY, String(v)); });
+    if(resetSpeedBtn) resetSpeedBtn.addEventListener('click', (e)=>{ ripple(resetSpeedBtn,e); clickSfx(); applyPreset('normal'); });
+
+    window.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Escape'){
+        if(settingsBackdrop.classList.contains('show')){ closeSettings(); clickSfx(); }
+        else hideZgptToast();
+      }
+    });
+
+    /* ========= zGPT button behavior ========= */
+    const zgptBtn = $('#zgptBtn');
+    const zgptToast = $('#zgptToast');
+    const zgptClose = $('#zgptClose');
+
+    function showZgptToast(){
+      if(!zgptToast || !zgptBtn) return;
+      zgptToast.classList.add('show');
+      zgptToast.setAttribute('aria-hidden','false');
+      zgptBtn.setAttribute('aria-expanded','true');
+      clickSfx();
+      window.zgptHideTimeout && clearTimeout(window.zgptHideTimeout);
+      window.zgptHideTimeout = setTimeout(hideZgptToast, 7000);
+    }
+    function hideZgptToast(){
+      if(!zgptToast || !zgptBtn) return;
+      zgptToast.classList.remove('show');
+      zgptToast.setAttribute('aria-hidden','true');
+      zgptBtn.setAttribute('aria-expanded','false');
+      window.zgptHideTimeout && clearTimeout(window.zgptHideTimeout);
+    }
+
+    zgptBtn && zgptBtn.addEventListener('click', (e)=>{
+      const span = document.createElement('span');
+      span.style.position = 'absolute';
+      span.style.left = '50%';
+      span.style.top = '50%';
+      span.style.width = '8px';
+      span.style.height = '8px';
+      span.style.borderRadius = '50%';
+      span.style.background = 'rgba(255,255,255,0.12)';
+      span.style.transform = 'translate(-50%,-50%) scale(0)';
+      span.style.transition = 'transform .4s ease, opacity .4s ease';
+      zgptBtn.appendChild(span);
+      requestAnimationFrame(()=>{ span.style.transform = 'translate(-50%,-50%) scale(14)'; span.style.opacity = '0'; });
+      setTimeout(()=>span.remove(),420);
+
+      showZgptToast();
+    });
+
+    zgptClose && zgptClose.addEventListener('click', hideZgptToast);
+
+    document.addEventListener('click', (e)=>{
+      const target = e.target;
+      if(!zgptToast || !zgptBtn) return;
+      if(zgptToast.classList.contains('show')){
+        if(!zgptToast.contains(target) && !zgptBtn.contains(target)){
+          hideZgptToast();
+        }
+      }
+    });
+
+    if(apiKeyInput) apiKeyInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); saveApiBtn.click(); } });
+
+    (function init(){
+      populateApiInput();
+      if(!localStorage.getItem(KEY_TYPING_SPEED)) localStorage.setItem(KEY_TYPING_SPEED, String(DEFAULTS.typingSpeed));
+      if(!localStorage.getItem(KEY_RESPONSE_DELAY)) localStorage.setItem(KEY_RESPONSE_DELAY, String(DEFAULTS.responseDelay));
+      updateSettingsUI();
+    })();
+    /* ======= End of script ====== */
+  </script>
+  <!-- ====== START: Inject download buttons for #musicDropdown (idempotent) ====== -->
+<script>
+(function installMusicDownloadButtons(){
+  try{
+    const dropdown = document.getElementById('musicDropdown');
+    if(!dropdown) return; // nothing to do
+
+    // cleanup previous injections (safe if user pastes multiple times)
+    dropdown.querySelectorAll('.download-btn').forEach(n=>n.remove());
+
+    const items = Array.from(dropdown.querySelectorAll('.dropdown-item'));
+    if(!items.length) return;
+
+    items.forEach(item=>{
+      const file = item.getAttribute('data-file') || '#';
+      const name = (item.getAttribute('data-name') || item.textContent || 'lagu').replace(/["']/g,'');
+
+      // ensure a song-label wrapper exists so layout stable
+      let label = item.querySelector('.song-label');
+      if(!label){
+        const txt = item.textContent.trim();
+        item.textContent = ''; // clear raw text
+        label = document.createElement('div');
+        label.className = 'song-label';
+        label.textContent = txt;
+        item.appendChild(label);
+      }
+
+      // create download control
+      const dl = document.createElement('a');
+      dl.className = 'download-btn';
+      dl.setAttribute('role','button');
+      dl.setAttribute('aria-label','Download ' + name);
+      dl.setAttribute('title','Download');
+      dl.href = file;
+      dl.setAttribute('download','');
+
+      // inline SVG + accessible sr-only text
+      dl.innerHTML = `
+        <span class="sr-only">Download ${name}</span>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor" opacity="0.06"/>
+          <path d="M12 16V8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8.5 11.5L12 15l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6 18h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+
+      // prevent parent click (so it won't trigger play)
+      dl.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        ev.preventDefault();
+        try{ ripple(dl, ev); }catch(e){}
+        try{ clickSfx(); }catch(e){}
+        try{ showToast('Mengunduh: ' + name); }catch(e){}
+
+        (async ()=>{
+          try{
+            const resp = await fetch(file, {cache:'no-cache', mode:'cors'});
+            if(!resp.ok) throw new Error('fetch failed: ' + resp.status);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const guessed = (file.split('/').pop() || '').split('?')[0] || (name.replace(/\s+/g,'_') + '.mp3');
+            a.download = guessed;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(()=> URL.revokeObjectURL(url), 1500);
+          }catch(err){
+            console.warn('download fallback', err);
+            const a2 = document.createElement('a');
+            a2.href = file;
+            a2.target = '_blank';
+            a2.rel = 'noopener noreferrer';
+            document.body.appendChild(a2);
+            a2.click();
+            a2.remove();
+          }
+        })();
+      });
+
+      // keyboard activation safe
+      dl.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          dl.click();
+        }
+      });
+
+      // append to item
+      item.appendChild(dl);
+    });
+  }catch(e){
+    console.warn('installMusicDownloadButtons failed', e);
+  }
+})();
+// run again after small delay to catch dynamic DOM insertions (defensive)
+setTimeout(()=>{ try{ if(typeof installMusicDownloadButtons === 'function') installMusicDownloadButtons(); }catch(e){} }, 350);
+</script>
+<script>
+(function(){
+  if(!window || !document) return;
+  const msgs = $('#messages');
+  if(!msgs) return;
+
+  /* Auto-hide / show & drag custom scrollbar */
+  let hideTimer = null;
+  const HIDE_DELAY = 900;
+
+  // create scrollbar DOM
+  const scrollbar = document.createElement('div');
+  scrollbar.className = 'custom-scrollbar';
+  scrollbar.innerHTML = '<div class="track" role="presentation"><div class="thumb" role="slider" aria-label="Gulir chat" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>';
+  // attach to panel (messages' parent so absolute pos is inside panel)
+  const panel = msgs.closest('.panel') || document.body;
+  panel.appendChild(scrollbar);
+
+  const thumb = scrollbar.querySelector('.thumb');
+  const track = scrollbar.querySelector('.track');
+
+  // show scrollbar helper
+  function showCustomScrollbar(){
+    scrollbar.classList.add('show');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(()=> scrollbar.classList.remove('show'), HIDE_DELAY);
+  }
+
+  // update thumb size & position
+  function refreshThumb(){
+    const ch = msgs.clientHeight;
+    const sh = msgs.scrollHeight || 1;
+    const ratio = ch / sh;
+    const thumbH = Math.max(Math.round(ch * Math.max(0.08, ratio)), 36);
+    const maxTop = Math.max(0, msgs.clientHeight - thumbH);
+    const scrollRatio = msgs.scrollTop / (sh - ch || 1);
+    const top = Math.round(scrollRatio * maxTop);
+    thumb.style.height = thumbH + 'px';
+    thumb.style.transform = `translateY(${top}px)`;
+    // aria value
+    const val = Math.round(scrollRatio*100);
+    thumb.setAttribute('aria-valuenow', String(val));
+  }
+
+  // sync on scroll/resize
+  msgs.addEventListener('scroll', ()=>{ refreshThumb(); showCustomScrollbar(); handleScrollEdgeChecks(); });
+  window.addEventListener('resize', refreshThumb);
+
+  // track click -> jump to position (page size)
+  track.addEventListener('click', (ev)=>{
+    if(ev.target === thumb) return;
+    const rect = track.getBoundingClientRect();
+    const y = ev.clientY - rect.top;
+    const ch = msgs.clientHeight;
+    const sh = msgs.scrollHeight;
+    // center thumb at click
+    const targetRatio = (y - thumb.clientHeight/2) / Math.max(1, (rect.height - thumb.clientHeight));
+    msgs.scrollTo({ top: Math.round((sh - ch) * Math.min(1, Math.max(0, targetRatio))), behavior: 'smooth' });
+  });
+
+  // drag thumb -> scroll
+  let dragging = false;
+  let dragStartY = 0;
+  let startScrollTop = 0;
+  function startDrag(ev){
+    ev.preventDefault();
+    dragging = true;
+    dragStartY = (ev.touches ? ev.touches[0].clientY : ev.clientY);
+    startScrollTop = msgs.scrollTop;
+    document.documentElement.classList.add('no-select');
+    showCustomScrollbar();
+  }
+  function onDragMove(ev){
+    if(!dragging) return;
+    const clientY = (ev.touches ? ev.touches[0].clientY : ev.clientY);
+    const delta = clientY - dragStartY;
+    const ch = msgs.clientHeight;
+    const sh = msgs.scrollHeight;
+    const thumbH = thumb.clientHeight;
+    const trackH = track.clientHeight;
+    const maxThumbTop = Math.max(0, trackH - thumbH);
+    // convert delta px into scrollTop change
+    const scrollDelta = Math.round(delta * ( (sh - ch) / Math.max(1, maxThumbTop) ));
+    msgs.scrollTop = Math.max(0, Math.min(sh - ch, startScrollTop + scrollDelta));
+  }
+  function endDrag(){
+    if(!dragging) return;
+    dragging = false;
+    document.documentElement.classList.remove('no-select');
+    showCustomScrollbar();
+  }
+  thumb.addEventListener('mousedown', startDrag);
+  thumb.addEventListener('touchstart', startDrag, {passive:false});
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('touchmove', onDragMove, {passive:false});
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+  document.addEventListener('touchcancel', endDrag);
+
+  // initial refresh
+  refreshThumb();
+
+  // Auto hide logic on mouse enter/leave
+  panel.addEventListener('mouseenter', showCustomScrollbar);
+  panel.addEventListener('mouseleave', ()=>{ hideTimer = setTimeout(()=> scrollbar.classList.remove('show'), HIDE_DELAY); });
+
+  // ===== preserve visible content when appending messages (no jump) =====
+  // We'll override addBubble (wrap original behavior). If addBubble exists, replace it.
+  if(typeof addBubble === 'function'){
+    const origAddBubble = addBubble;
+    window.addBubble = function(text, who='bot'){
+      // store current scroll state
+      const wasNear = (msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight) < SCROLL_THRESHOLD;
+      const prevScrollHeight = msgs.scrollHeight;
+      const prevScrollTop = msgs.scrollTop;
+
+      const node = origAddBubble(text, who); // call existing logic which appends
+      // after append, if user was NOT near bottom -> preserve offset
+      if(!wasNear && msgs){
+        const delta = msgs.scrollHeight - prevScrollHeight;
+        msgs.scrollTop = Math.max(0, prevScrollTop + delta);
+        // show small unobtrusive toast/indicator that there are new messages
+        showScrollBtn(); // keep existing scroll-to-bottom button visible so user can jump
+      } else {
+        // ensure we are at bottom
+        msgs.scrollTop = msgs.scrollHeight;
+        hideScrollBtn();
+      }
+      refreshThumb();
+      return node;
+    };
+  }
+  // call loadOlderMessages when near top
+  function handleScrollEdgeChecks(){
+    // near top
+    if(msgs.scrollTop <= 120 && !loadingOlder){
+      loadOlderMessages().catch(()=>{ loadingOlder = false; });
+    }
+  }
+  // initial check
+  handleScrollEdgeChecks();
+
+  // ===== keyboard shortcuts (Home/End/PageUp/PageDown) =====
+  panel.addEventListener('keydown', (ev)=>{
+    if(['PageUp','PageDown','Home','End'].includes(ev.key)){
+      ev.preventDefault();
+      const ch = msgs.clientHeight;
+      if(ev.key === 'PageUp') msgs.scrollBy({ top: -ch*0.9, behavior: 'smooth' });
+      if(ev.key === 'PageDown') msgs.scrollBy({ top: ch*0.9, behavior: 'smooth' });
+      if(ev.key === 'Home') msgs.scrollTo({ top: 0, behavior: 'smooth' });
+      if(ev.key === 'End') msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
+    }
+  });
+
+  // When window visibility changes, refresh thumb (in some browsers layout may shift)
+  document.addEventListener('visibilitychange', ()=> setTimeout(refreshThumb, 160));
+
+  // ensure thumb updates periodically just-in-case (eg fonts load)
+  setTimeout(refreshThumb, 800);
+  setTimeout(refreshThumb, 2000);
+
+  // expose refresh function if dev wants to call
+  window.refreshChatScrollbar = refreshThumb;
+
+})();
+</script>
+
+
+<!-- Scroll-fix and layout overrides injected by assistant -->
+<style id="assistant-scroll-fix-override">
+/* Make messages container properly scrollable and prevent parent growth */
+.panel{ grid-template-rows: minmax(0, 1fr) auto !important; overflow: hidden !important; }
+.panel .messages{ display: flex !important; flex-direction: column !important; min-height: 0 !important; height: auto !important; max-height: calc(100vh - 220px) !important; overflow: auto !important; box-sizing: border-box !important; padding: 20px !important; }
+
+/* Ensure each message row takes full width and doesn't force parent to expand */
+.panel .messages > *{ flex: 0 0 auto !important; width: 100% !important; box-sizing: border-box !important; align-self: stretch !important; }
+
+/* If messages use row+avatar+bubble layout, make avatar fixed size and bubble flexible */
+.panel .messages .row, .panel .messages .message-row, .panel .messages .message{ display: flex !important; align-items: flex-start !important; gap: 12px !important; }
+.panel .messages .avatar, .panel .messages .av, .panel .messages .icon{ flex: 0 0 48px !important; width:48px !important; height:48px !important; }
+.panel .messages .bubble, .panel .messages .message-bubble, .panel .messages .content{ flex: 1 1 auto !important; max-width: calc(100% - 64px) !important; word-break: break-word !important; white-space: normal !important; }
+
+/* Prevent very long words/HTML from expanding container */
+.panel .messages *{ overflow-wrap: anywhere !important; }
+
+/* If there's a custom scrollbar element, keep it inside panel */
+.custom-scrollbar, .scrollbar, .track, .thumb{ position: absolute !important; right: 8px !important; top: 64px !important; bottom: 88px !important; }
+
+/* Small visual tweaks */
+.panel .messages::-webkit-scrollbar { width: 10px; }
+.panel .messages::-webkit-scrollbar-thumb { border-radius: 8px; }
+</style>
+
+<!-- Runtime scroll-fix injector (injected by assistant) -->
+<script>
+(function(){
+  function applyScrollFix(){
+    try{
+      const panel = document.querySelector('.panel');
+      const msgs = document.querySelector('.messages');
+      if(panel){
+        panel.style.gridTemplateRows = panel.style.gridTemplateRows || 'minmax(0, 1fr) auto';
+        panel.style.overflow = panel.style.overflow || 'hidden';
+      }
+      if(msgs){
+        msgs.style.minHeight = msgs.style.minHeight || '0';
+        msgs.style.display = msgs.style.display || 'flex';
+        msgs.style.flexDirection = msgs.style.flexDirection || 'column';
+        msgs.style.overflow = msgs.style.overflow || 'auto';
+        msgs.style.boxSizing = msgs.style.boxSizing || 'border-box';
+        if(!msgs.style.scrollBehavior) msgs.style.scrollBehavior = 'smooth';
+      }
+      document.querySelectorAll('.row').forEach(r => {
+        if(!r.style.alignItems) r.style.alignItems = 'flex-start';
+      });
+
+      setTimeout(()=>{
+        try{ if(typeof refreshThumb === 'function') refreshThumb(); }catch(e){}
+      }, 120);
+    }catch(err){ console.warn('scroll-fix injector failed', err); }
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyScrollFix);
+  else applyScrollFix();
+
+  const obs = new MutationObserver((mut)=>{
+    applyScrollFix();
+  });
+  const root = document.querySelector('.panel') || document.body;
+  if(root) obs.observe(root, {childList:true, subtree:true, attributes:false});
+})();
+</script>
+<!-- End of injected scroll-fix -->
+
+
+<!-- Assistant runtime fixes v2: remove custom scrollbar overlays & fix bubble sizing -->
+<style>
+/* Hide likely custom scrollbar overlay elements (they'll be removed by JS too) */
+.custom-scroll, .scrollbar, .track, .scroll-track, .scrollbar-track,
+.ps__rail-y, .y-scrollbar, .vertical-scroll, .scrollbar-outer { display:none !important; }
+
+/* Ensure messages area is the single scroll container */
+.messages {
+  overflow: auto !important;
+  max-height: calc(100vh - 220px) !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Make native scrollbar visible but slim */
+.messages::-webkit-scrollbar { width: 10px; height: 10px; }
+.messages::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(100,100,255,0.9); }
+.messages::-webkit-scrollbar-track { background: transparent; }
+
+/* Message row and bubble sizing rules */
+.row { display:flex !important; align-items:flex-start !important; gap:12px !important; }
+.row .avatar { flex: 0 0 52px !important; width:52px !important; height:52px !important; margin-top:6px !important; }
+.row .bubble, .message, .chat-bubble, .msg-content, .message-body {
+  display:inline-block !important;
+  width: auto !important;
+  max-width: calc(100% - 90px) !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  box-sizing: border-box !important;
+  padding: 10px 16px !important;
+  min-height: 0 !important;
+}
+
+/* If there are empty bubble elements (no text), collapse them */
+.bubble:empty, .message:empty, .chat-bubble:empty { display:none !important; }
+
+/* Avoid forcing fixed heights */
+[style*="height: 100%"], [style*="min-height: 100%"] { min-height: 0 !important; height: auto !important; }
+
+</style>
+
+<script>
+(function(){
+  // Remove common custom scrollbar overlay elements if present
+  const selectors = [
+    '.custom-scroll', '.scrollbar', '.track', '.scroll-track', '.scrollbar-track',
+    '.ps__rail-y', '.y-scrollbar', '.vertical-scroll', '.scrollbar-outer'
+  ];
+  selectors.forEach(s=>{
+    document.querySelectorAll(s).forEach(el=>{
+      try{ el.remove(); }catch(e){}
+    });
+  });
+
+  // Force messages container to be sole scroll target
+  const msgs = document.querySelector('.messages') || document.querySelector('#messages') || document.querySelector('[role="log"]');
+  if(msgs){
+    msgs.style.overflow = 'auto';
+    msgs.style.maxHeight = msgs.style.maxHeight || 'calc(100vh - 220px)';
+    // remove inline styles that make children expand parent
+    msgs.querySelectorAll('*').forEach(ch=>{
+      // remove some problematic inline heights that may be set by original scripts
+      if(ch.style){
+        if(ch.style.height && ch.style.height.endsWith('%')) ch.style.height = 'auto';
+        if(ch.style.minHeight && ch.style.minHeight.endsWith('%')) ch.style.minHeight = '0px';
+      }
+    });
+  }
+
+  // Fix bubbles that have inline width/height forcing full length
+  const bubbleSelectors = ['.bubble', '.message', '.chat-bubble', '.msg-content', '.message-body'];
+  bubbleSelectors.forEach(sel=>{
+    document.querySelectorAll(sel).forEach(b=>{
+      try{
+        b.style.width = 'auto';
+        b.style.maxWidth = 'calc(100% - 90px)';
+        b.style.whiteSpace = 'normal';
+        b.style.wordBreak = 'break-word';
+        // collapse if no textual content
+        if(b.textContent.trim().length === 0){
+          b.style.display = 'none';
+        }
+      }catch(e){}
+    });
+  });
+
+  // Reapply again when DOM mutates (new messages)
+  const obs = new MutationObserver(()=>{
+    // remove overlays and re-fix bubbles quickly
+    selectors.forEach(s=>{
+      document.querySelectorAll(s).forEach(el=>{
+        try{ el.remove(); }catch(e){}
+      });
+    });
+    bubbleSelectors.forEach(sel=>{
+      document.querySelectorAll(sel).forEach(b=>{
+        try{
+          b.style.width = 'auto';
+          b.style.maxWidth = 'calc(100% - 90px)';
+          b.style.whiteSpace = 'normal';
+          b.style.wordBreak = 'break-word';
+          if(b.textContent.trim().length === 0) b.style.display = 'none';
+        }catch(e){}
+      });
+    });
+  });
+
+  const root = document.querySelector('.panel') || document.body;
+  if(root) obs.observe(root, { childList:true, subtree:true, attributes:false });
+})();
+</script>
+<!-- End assistant fixes v2 -->
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DustineGPT — Intro</title>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --accent1:#8a2be2;
+      --accent2:#0b3bff;
+      --fg:#fff;
+      --ring: rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    body{
+      background:
+        radial-gradient(1200px 800px at 80% 10%, rgba(25,0,255,0.18), transparent 60%),
+        radial-gradient(1000px 700px at 10% 90%, rgba(140,0,255,0.22), transparent 60%),
+        linear-gradient(160deg,#0b0220 0%,#060616 50%,#04040b 100%);
+      color:var(--fg);
+      overflow:hidden;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* STAR CANVAS (background life) */
+    .sky{ position:fixed; inset:0; z-index:-2; overflow:hidden; }
+    canvas.stars{ width:100%; height:100%; display:block; }
+
+    /* CENTERING: logo + title stacked, perfectly centered */
+    .center {
+      position:relative;
+      width:100%;
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;    /* horizontal center */
+      justify-content:center;/* vertical center */
+      gap:18px;
+      pointer-events:none;
+    }
+
+    /* LOGO CARD */
+    .logo{
+      width:220px;
+      height:220px;
+      padding:22px;
+      border-radius:36px;
+      display:grid;
+      place-items:center;
+      background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      box-shadow: 0 24px 60px rgba(0,0,0,.6), inset 0 0 0 1px var(--ring);
+      transform-origin:center;
+      animation: floaty 20s ease-in-out infinite; /* tetap 20s */
+      pointer-events:auto;
+    }
+
+    @keyframes floaty{
+      0%,100%{ transform: translateY(10px) rotate(-0.6deg) scale(1); }
+      50%   { transform: translateY(-10px) rotate(0.6deg) scale(1.01); }
+    }
+
+    .mark{ width:140px; height:140px; display:block; }
+
+    /* draw 9s, then gentleFlow loops (sync w/ floaty but delayed) */
+    .mark path{
+      fill:none;
+      stroke:#fff;
+      stroke-width:8;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      stroke-dasharray:420;
+      stroke-dashoffset:420;
+      filter: drop-shadow(0 8px 26px rgba(255,255,255,.10));
+      animation:
+        draw 80s cubic-bezier(.2,.9,.2,1) forwards,
+        gentleFlow 20s ease-in-out 9s infinite;
+      transform-origin:center;
+    }
+    @keyframes draw{ to { stroke-dashoffset: 0; } }
+    @keyframes gentleFlow{
+      0%{ transform: translateY(0) rotate(0); filter: drop-shadow(0 8px 26px rgba(255,255,255,.10)); }
+      50%{ transform: translateY(-1px) rotate(0.2deg); filter: drop-shadow(0 12px 34px rgba(255,255,255,.12)); }
+      100%{ transform: translateY(0) rotate(0); filter: drop-shadow(0 8px 26px rgba(255,255,255,.10)); }
+    }
+
+    /* TITLE BELOW LOGO */
+    .logo-title{
+      opacity:0;
+      transform: translateY(10px) scale(.98);
+      transition: opacity .36s ease, transform .36s cubic-bezier(.2,.9,.3,1);
+      pointer-events:none;
+      user-select:none;
+
+      font-weight:900;
+      font-size:36px;   /* lebih besar sesuai permintaan */
+      letter-spacing:0.02em;
+      line-height:1;
+      text-align:center;
+
+      background: linear-gradient(90deg,var(--accent1),var(--accent2));
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
+
+    /* visible => entrance + 5s shine (then glow removed by keyframes) */
+    .logo-title.visible{
+      opacity:1;
+      transform: translateY(0) scale(1);
+      animation:
+        titleEntrance .8s cubic-bezier(.2,.9,.2,1) forwards,
+        titleShine 5s ease-in-out .8s forwards; /* shine starts after entrance */
+    }
+    @keyframes titleEntrance{
+      from{ opacity:0; transform: translateY(10px) scale(.98); filter: blur(2px) brightness(.92); }
+      to  { opacity:1; transform: translateY(0) scale(1); filter: blur(0) brightness(1); }
+    }
+    @keyframes titleShine{
+      0%{ text-shadow: none; filter: brightness(1); }
+      20%{ text-shadow: 0 0 16px rgba(138,43,226,0.9), 0 0 34px rgba(11,59,255,0.6); filter: brightness(1.45); }
+      55%{ text-shadow: 0 0 28px rgba(138,43,226,1), 0 0 54px rgba(11,59,255,0.75); filter: brightness(1.25); }
+      90%{ text-shadow: 0 0 12px rgba(138,43,226,0.55), 0 0 26px rgba(11,59,255,0.38); filter: brightness(1.05); }
+      100%{ text-shadow:none; filter:none; }
+    }
+/* SUBTITLE (fade + move-up) */
+.logo-subtitle{
+  opacity:0;
+  transform: translateY(10px);
+  transition: opacity .8s ease, transform .8s cubic-bezier(.2,.9,.2,1);
+  font-size:16px;
+  color:#fff;
+  letter-spacing:0.01em;
+  text-align:center;
+}
+.logo-subtitle.visible{
+  opacity:1;
+  transform: translateY(0);
+}
+    /* small screens */
+    @media(max-width:520px){
+      .logo{ width:160px; height:160px; padding:14px; border-radius:28px; }
+      .mark{ width:100px; height:100px; }
+      .logo-title{ font-size:22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <canvas class="stars" id="stars"></canvas>
+  </div>
+
+  <div class="center" role="img" aria-label="Animasi logo DustineGPT">
+    <div class="logo" aria-hidden="false" aria-label="Logo DustineGPT">
+      <svg class="mark" viewBox="0 0 100 100" width="140" height="140" aria-hidden="true" focusable="false">
+        <path d="M25 20 L25 80 Q60 80 60 50 Q60 20 25 20"/>
+        <path d="M75 30 Q50 15 35 30 Q20 45 35 65 Q50 85 75 70 L75 55 L60 55"/>
+      </svg>
+    </div>
+
+    <!-- TITLE: positioned BELOW the logo (not overlay) -->
+    <div id="title" class="logo-title" aria-hidden="true">DustineGPT</div>
+    <div id="subtitle" class="logo-subtitle" aria-hidden="true">Rilis bulan September ini.</div>
+  </div>
+
+  <script>
+    /* STARFIELD: slow twinkle */
+    (function(){
+      const canvas = document.getElementById('stars');
+      const ctx = canvas && canvas.getContext && canvas.getContext('2d');
+      if(!ctx) return;
+      let stars = [];
+      function resize(){
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const count = Math.min(300, Math.floor(window.innerWidth*window.innerHeight/9000));
+        stars = Array.from({length:count}, ()=>({
+          x: Math.random()*canvas.width,
+          y: Math.random()*canvas.height,
+          r: Math.random()*1.4 + 0.2,
+          t: Math.random()*Math.PI*2,
+          s: Math.random()*0.6+0.2
+        }));
+      }
+      function draw(){
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        for(const st of stars){
+          st.t += 0.004 * st.s;
+          const alpha = 0.35 + Math.sin(st.t) * 0.28;
+          ctx.beginPath();
+          ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.fill();
+        }
+        requestAnimationFrame(draw);
+      }
+      window.addEventListener('resize', resize);
+      resize(); draw();
+    })();
+
+    /* Reveal title AFTER 9 seconds exactly */
+    (function(){
+      const title = document.getElementById('title');
+      if(!title) return;
+      setTimeout(()=>{
+        title.setAttribute('aria-hidden','false');
+        title.classList.add('visible');
+      }, 9000); // 9000ms = 9s
+    })();
+    (function(){
+  const subtitle = document.getElementById('subtitle');
+  if(!subtitle) return;
+  // 9000ms + 500ms delay = 9500ms
+  setTimeout(()=>{
+    subtitle.setAttribute('aria-hidden','false');
+    subtitle.classList.add('visible');
+  }, 9500);
+})();
+
+  </script>
+</body>
+</html>
